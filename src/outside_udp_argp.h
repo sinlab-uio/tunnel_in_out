@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+
+#include <stdint.h>
 #include <argp.h>
 
 struct arguments

@@ -4,6 +4,7 @@
 // #include <string>
 // #include <vector>
 // #include <cstring> // For memset
+#include <string.h>
 
 #include <sys/types.h>
 // #include <sys/socket.h>

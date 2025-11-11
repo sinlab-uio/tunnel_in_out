@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 
+#include <stdint.h>
 #include <argp.h>
 #include "tunnel_out_argp.h"
 

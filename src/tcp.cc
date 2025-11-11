@@ -8,6 +8,7 @@
 // #include <netinet/in.h>
 // #include <arpa/inet.h>
 #include <unistd.h> // for close
+#include <string.h> // for strerror
 // #include <errno.h>  // for errno
 
 #include "sockaddr.h"

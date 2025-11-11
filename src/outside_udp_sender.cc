@@ -7,6 +7,7 @@
 #include <argp.h>
 
 #include <unistd.h> // for close
+#include <string.h> // for close
 
 #include "outside_udp_argp.h"
 // #include "tunnel_out_dispatch.h"

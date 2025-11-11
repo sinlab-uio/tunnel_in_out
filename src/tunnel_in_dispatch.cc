@@ -6,6 +6,7 @@
 
 #include <sys/select.h>
 #include <unistd.h> // for close
+#include <string.h> // for strerror
 
 #include "tunnel_in_dispatch.h"
 #include "sockaddr.h"

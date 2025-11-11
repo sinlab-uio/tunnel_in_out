@@ -13,21 +13,28 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_BUILD_TYPE Debug)
 
+include(CheckFunctionExists) # to check for argp in libc
+
 find_path(ARGP_INCLUDE_PATH "argp.h"
-          PATHS /opt/homebrew/include/
+          PATHS /usr/include /opt/homebrew/include/
           NO_DEFAULT_PATH)
 
 if (NOT ARGP_INCLUDE_PATH)
     message(FATAL_ERROR "argp.h not found. Please ensure argp-standalone is installed via Homebrew.")
 endif()
 
-# Find the argp library
-find_library(ARGP_LIBRARY "argp"
-             PATHS /opt/homebrew/lib
-             NO_DEFAULT_PATH)
+check_function_exists("argp_parse" ARGP_IN_LIBC)
+if(ARGP_IN_LIBC)
+		message(STATUS "argp found in libc")
+else()
+	# Find the argp library
+	find_library(ARGP_LIBRARY "argp"
+             	PATHS /opt/homebrew/lib
+             	NO_DEFAULT_PATH)
 
-if (NOT ARGP_LIBRARY)
-    message(FATAL_ERROR "libargp.a not found. Please ensure argp-standalone is installed via Homebrew.")
+	if (NOT ARGP_LIBRARY)
+    	message(FATAL_ERROR "libargp.a not found. Please ensure argp-standalone is installed via Homebrew.")
+	endif()
 endif()
 
 # Add include directory and link library to your target

@@ -2,6 +2,8 @@
 #include <string>
 
 #include <argp.h>
+#include <sys/types.h>
+#include <stdint.h>
 #include "tunnel_in_argp.h"
 
 const char *argp_program_version = "tunnel_in 0.1";
