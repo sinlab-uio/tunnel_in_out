@@ -1,3 +1,6 @@
+# ignore my build directory
+build/*
+
 # Prerequisites
 *.d
 
