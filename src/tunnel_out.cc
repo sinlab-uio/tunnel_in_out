@@ -42,6 +42,7 @@ int main( int argc, char* argv[] )
         return -1;
     }
     std::cout << "= Anonymous forwarding socket " << udp_forwarder.socket() << " created" << std::endl;
+    udp_forwarder.setNoBlock(); // collection should proceed if the UDP socket is temporarily blocked
 
     std::shared_ptr<TCPSocket> webSock;
 

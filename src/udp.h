@@ -1,22 +1,6 @@
 #pragma once
 
-// #include <iostream>
-// #include <string>
-// #include <vector>
-// #include <cstring> // For memset
-
 #include <sys/types.h>
-// #include <sys/socket.h>
-// #include <netinet/in.h>
-// #include <arpa/inet.h>
-// #include <unistd.h> // for close
-// #include <errno.h>  // for errno
-
-// #include <sys/types.h>
-// #include <net/if.h>
-// #include <ifaddrs.h>
-// #include <sys/types.h>
-// #include <netdb.h>
 
 #include "sockaddr.h"
 
@@ -50,6 +34,9 @@ public:
 
     // Integer value of the socket
     int socket() const;
+
+    // Set the socket to non-blocking mode.
+    void setNoBlock( );
 
     /* Returns the member variable _port.
      * It is not guaranteed that this is the variable that getsockname

@@ -10,7 +10,8 @@
 
 #include "tunnel_in_dispatch.h"
 #include "sockaddr.h"
-// #include "udp.h"
+#include "udp_packet.h"
+#include "udp_reconstructor.h"
 // #include "tcp.h"
 
 char udp_packet_buffer[10000];
@@ -19,44 +20,7 @@ char tcp_tunnel_buffer[10000];
 
 static const bool verbose = false;
 
-class UDPPacket
-{
-    uint32_t          _size;
-    std::vector<char> _buffer;
-
-public:
-    UDPPacket( uint32_t length )
-        : _size( length )
-    { }
-
-    /* Append bytes from a char vector to this UDP packet's char vector.
-     * Return false if the packet is incomplete.
-     * Return true if the packet is complete.
-     */
-    bool append( std::vector<char>& input );
-
-    const char* get()   const { return _buffer.data(); }
-    size_t      size()  const { return _size; }
-    bool        ready() const { return _buffer.size() == _size; }
-};
-
-class Reconstructor
-{
-    bool                   wait_for_length { true };
-    std::vector<char>      bytes_from_tunnel;
-    std::vector<UDPPacket> reconstructed_packets;
-public:
-    void collect_from_tunnel( const char* buffer, int buflen );
-
-    bool empty() const { return reconstructed_packets.empty(); }
-
-    const UDPPacket& front() const { return reconstructed_packets.front(); }
-
-    void sendLoop( UDPSocket& udp_forwarder, const SockAddr& dest );
-};
-
-Reconstructor reconstructor;
-
+UDPReconstructor reconstructor;
 
 void dispatch_loop( TCPSocket& tunnel,
                     UDPSocket& udp_forwarder,
@@ -75,13 +39,15 @@ void dispatch_loop( TCPSocket& tunnel,
     read_sockets.push_back( tunnel.socket() );
     read_sockets.push_back( udp_forwarder.socket() );
 
-    std::vector<int> write_sockets;
-    write_sockets.push_back( udp_forwarder.socket() );
-
     while( cont_loop )
     {
+        std::vector<int> write_sockets;
+        if( reconstructor.isWriteBlocked() )
+            write_sockets.push_back( udp_forwarder.socket() );
+
         FD_ZERO( &read_fds );
         FD_ZERO( &write_fds );
+
         std::cerr << "    call select with read fds ";
         for( auto it : read_sockets )
         {
@@ -129,6 +95,7 @@ std::cerr << __LINE__ << std::endl;
             else
             {
                 reconstructor.collect_from_tunnel( tcp_tunnel_buffer, retval );
+                reconstructor.sendLoop( udp_forwarder, dest_udp );
             }
         }
 
@@ -147,143 +114,8 @@ std::cerr << __LINE__ << std::endl;
         if( FD_ISSET( udp_forwarder.socket(), &write_fds ) )
         {
 std::cerr << __LINE__ << std::endl;
+            reconstructor.unblockWrite( );
             reconstructor.sendLoop( udp_forwarder, dest_udp );
-        }
-    }
-}
-
-bool UDPPacket::append( std::vector<char>& input )
-{
-    const int isize = input.size();
-    if( isize == 0 )
-    {
-        std::cerr << __PRETTY_FUNCTION__ << " trying to append an empty char vector" << std::endl;
-        return false;
-    }
-
-    int missing = _size - _buffer.size();
-    if( missing > 0 )
-    {
-        if( missing == isize )
-        {
-            _buffer.insert( _buffer.end(), input.begin(), input.end() );
-            input.clear();
-            return true;
-        }
-        else if( missing >= isize )
-        {
-            _buffer.insert( _buffer.end(), input.begin(), input.end() );
-            input.clear();
-            return false;
-        }
-        else
-        {
-            auto it = input.begin();
-            _buffer.insert( _buffer.end(), it, it+missing );
-            input.erase( it, it+missing );
-            return true;
-        }
-    }
-    else
-    {
-        std::cerr << __PRETTY_FUNCTION__ << " Programming error: trying to append bytes to a UDPPacket that is not missing any bytes." << std::endl;
-        return true;
-    }
-}
-
-void Reconstructor::collect_from_tunnel( const char* buffer, int buflen )
-{
-    if(verbose)
-        std::cerr << "    Appending " << buflen << " bytes to reconstruction buffer" << std::endl
-                  << "    Bytes before appending: " << bytes_from_tunnel.size() << std::endl;
-
-    bytes_from_tunnel.insert( bytes_from_tunnel.end(), buffer, buffer+buflen );
-
-    if(verbose)
-        std::cerr << "    Bytes after appending: " << bytes_from_tunnel.size() << std::endl;
-
-    while( !bytes_from_tunnel.empty() )
-    {
-        if(verbose)
-            std::cerr << "    reconstruction buffer contains "
-                      << bytes_from_tunnel.size() << " bytes" << std::endl;
-        if( wait_for_length ) // waiting for a length indicator from the tunnel
-        {
-            if(verbose)
-                std::cerr << "    waiting for length field" << std::endl;
-
-            if( bytes_from_tunnel.size() >= sizeof(uint32_t) )
-            {
-                if(verbose)
-                    std::cerr << "    taking length field from reconstruction buffer" << std::endl;
-
-                // read the length field and convert it to host byte order
-                uint32_t length;
-                memcpy( &length, bytes_from_tunnel.data(), sizeof(uint32_t) );
-                length = ntohl( length );
-
-                if(verbose)
-                    std::cerr << "    expecting " << length << " bytes for next UDP packet" << std::endl;
-
-                // erase the 4 consumed bytes from the buffer
-                auto it = bytes_from_tunnel.begin();
-                bytes_from_tunnel.erase( it, it+sizeof(uint32_t) );
-
-                // Put an incomplete UDP packet into the packet queue
-                reconstructed_packets.emplace_back( UDPPacket( length ) );
-                if(verbose) std::cerr << "    UDP packet created and inserted" << std::endl;
-
-                wait_for_length = false;
-            }
-            else
-            {
-                // not enough received, go back to dispatch loop
-                break;
-            }
-        }
-        else if( reconstructed_packets.empty() )
-        {
-            std::cerr << __PRETTY_FUNCTION__ << " Programming Error: not waiting for a length field but not incomplete UDP packet in the queue, either" << std::endl;
-            exit( -1 );
-        }
-        else
-        {
-            if(verbose)
-                std::cerr << "    waiting for data, appending from bytes_from_tunnel.size()" << std::endl;
-
-            bool packet_complete = reconstructed_packets.back().append( bytes_from_tunnel );
-            if( packet_complete )
-            {
-                std::cerr << "    a packet of size " << reconstructed_packets.back().size() << " is complete" << std::endl;
-                wait_for_length = true;
-            }
-            if(verbose)
-                std::cerr << "    bytes still in reconstructions buffer: " << bytes_from_tunnel.size() << std::endl;
-        }
-    }
-}
-
-void Reconstructor::sendLoop( UDPSocket& udp_forwarder, const SockAddr& dest )
-{
-    while( !reconstructed_packets.empty() )
-    {
-        const UDPPacket& pkt( reconstructed_packets.front() );
-
-        bool success = udp_forwarder.send( pkt.get(), pkt.size(), dest );
-        if( success )
-        {
-            std::cerr << "Sent a UDP packet of size " << pkt.size() << std::endl;
-            /* Passed the packet to the ::sendto function, we
-             * can destroy the queue entry now.
-             */
-            reconstructed_packets.erase( reconstructed_packets.begin() );
-        }
-        else
-        {
-            /* Failed to send that UDP packet. Waiting for the
-             * socket to report writeable again.
-             */
-            break;
         }
     }
 }

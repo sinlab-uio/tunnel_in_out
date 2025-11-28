@@ -53,7 +53,9 @@ target_link_libraries( TunnelIn tunnelNet ${ARGP_LIBRARY} )
 
 add_executable( TunnelOut src/tunnel_out.cc
 	                 src/tunnel_out_argp.cc src/tunnel_out_argp.h
-	                 src/tunnel_out_dispatch.cc src/tunnel_out_dispatch.h )
+	                 src/tunnel_out_dispatch.cc src/tunnel_out_dispatch.h
+		 	 src/udp_packet.cc src/udp_packet.h
+		 	 src/udp_reconstructor.cc src/udp_reconstructor.h)
 target_link_libraries( TunnelOut tunnelNet ${ARGP_LIBRARY} )
 
 add_executable( OutsideUDP src/outside_udp_sender.cc

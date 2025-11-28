@@ -8,6 +8,10 @@
 // #include <arpa/inet.h>
 #include <unistd.h> // for close
 #include <string.h> // for strerror
+// #include <unistd.h>
+#include <fcntl.h>
+// #include <sys/socket.h> // For socket creation and types
+
 // #include <errno.h>  // for errno
 
 #include "sockaddr.h"
@@ -81,6 +85,19 @@ void UDPSocket::destroy( )
 int UDPSocket::socket() const
 {
     return _sock;
+}
+
+void UDPSocket::setNoBlock( )
+{
+    /* In attempting to set the socket non-blocking, we ignore
+     * error because we cannot do anything about them anyway.
+     */
+    int flags = fcntl( _sock, F_GETFL, 0 );
+    if( flags == -1 ) return;
+
+    flags |= O_NONBLOCK;
+
+    fcntl( _sock, F_SETFL, flags );
 }
 
 int UDPSocket::recv( char* buffer, size_t buflen, SockAddr& clientAddr )
