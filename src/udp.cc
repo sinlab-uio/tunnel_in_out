@@ -130,7 +130,7 @@ int UDPSocket::send( const char* buffer, size_t buflen, const SockAddr& dest )
     int bytesSent = sendto( _sock, buffer, buflen, 0, dest.get(), dest.size() );
     if (bytesSent < 0)
     {
-        std::cerr << __PRETTY_FUNCTION__ << "sendto failed: " << strerror(errno) << std::endl;
+        std::cerr << __PRETTY_FUNCTION__ << "sendto " << dest.size() << " bytes failed: " << strerror(errno) << std::endl;
         return bytesSent;
     }
 

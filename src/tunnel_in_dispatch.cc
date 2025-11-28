@@ -13,9 +13,11 @@
 // #include "udp.h"
 // #include "tcp.h"
 
-char udp_packet_buffer[10000];
-char tcp_websock_buffer[10000];
-char tcp_tunnel_buffer[10000];
+static const size_t max_buffer_size = 100000;
+
+char udp_packet_buffer[max_buffer_size];
+char tcp_websock_buffer[max_buffer_size];
+char tcp_tunnel_buffer[max_buffer_size];
 
 void dispatch_loop( TCPSocket& tunnel_listener,
                     UDPSocket& outside_udp,
@@ -99,7 +101,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
         if( FD_ISSET( outside_udp.socket(), &fds ) )
         {
             // std::cerr << "Activity on UDP socket " << outside_udp.socket() << std::endl;
-            retval = outside_udp.recv( udp_packet_buffer, 10000 );
+            retval = outside_udp.recv( udp_packet_buffer, max_buffer_size );
             if( retval < 0 )
             {
                 std::cerr << "Read from outside UDP socket failed. " << strerror(errno) << std::endl;
@@ -128,7 +130,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
 
         if( tunnel && FD_ISSET( tunnel->socket(), &fds ) )
         {
-            int retval = tunnel->recv( tcp_tunnel_buffer, 10000 );
+            int retval = tunnel->recv( tcp_tunnel_buffer, max_buffer_size );
             if( retval == 0 )
             {
                 std::cerr << "Reading from TCP tunnel returned 0. Broken connection? Quitting." << std::endl;
@@ -138,7 +140,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
 
         if( webSock && FD_ISSET( webSock->socket(), &fds ) )
         {
-            webSock->recv( tcp_websock_buffer, 10000 );
+            webSock->recv( tcp_websock_buffer, max_buffer_size );
         }
     }
 }

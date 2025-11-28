@@ -14,9 +14,11 @@
 #include "udp_reconstructor.h"
 // #include "tcp.h"
 
-char udp_packet_buffer[10000];
-char tcp_websock_buffer[10000];
-char tcp_tunnel_buffer[10000];
+static const size_t max_buffer_size = 100000;
+
+char udp_packet_buffer[max_buffer_size];
+char tcp_websock_buffer[max_buffer_size];
+char tcp_tunnel_buffer[max_buffer_size];
 
 static const bool verbose = false;
 
@@ -80,7 +82,7 @@ std::cerr << __LINE__ << std::endl;
         if( FD_ISSET( tunnel.socket(), &read_fds ) )
         {
 std::cerr << __LINE__ << std::endl;
-            int retval = tunnel.recv( tcp_tunnel_buffer, 10000 );
+            int retval = tunnel.recv( tcp_tunnel_buffer, max_buffer_size );
             if( retval < 0 )
             {
                 std::cerr << "Error in TCP tunnel, socket " << tunnel.socket() << ". "
@@ -102,13 +104,13 @@ std::cerr << __LINE__ << std::endl;
         if( FD_ISSET( udp_forwarder.socket(), &read_fds ) )
         {
 std::cerr << __LINE__ << std::endl;
-            udp_forwarder.recv( udp_packet_buffer, 10000 );
+            udp_forwarder.recv( udp_packet_buffer, max_buffer_size );
         }
 
         if( webSock && FD_ISSET( webSock->socket(), &read_fds ) )
         {
 std::cerr << __LINE__ << std::endl;
-            webSock->recv( tcp_websock_buffer, 10000 );
+            webSock->recv( tcp_websock_buffer, max_buffer_size );
         }
 
         if( FD_ISSET( udp_forwarder.socket(), &write_fds ) )
