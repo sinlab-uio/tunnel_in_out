@@ -42,3 +42,5 @@ public:
     std::ostream& print( std::ostream& ostr ) const;
 };
 
+std::ostream& operator<< ( std::ostream& ostr, const SockAddr& addr );
+

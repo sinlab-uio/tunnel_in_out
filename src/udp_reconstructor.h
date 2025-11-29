@@ -11,7 +11,7 @@ class UDPReconstructor
     std::vector<char>      bytes_from_tunnel;
     std::vector<UDPPacket> reconstructed_packets;
     bool                   write_blocked { false };
-    bool                   verbose { false };
+    bool                   verbose { true };
 public:
     void setNoBlock( UDPSocket& write_socket );
 

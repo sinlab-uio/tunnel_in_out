@@ -93,3 +93,8 @@ std::ostream& SockAddr::print( std::ostream& ostr ) const
     return ostr;
 }
 
+std::ostream& operator<< ( std::ostream& ostr, const SockAddr& addr )
+{
+    return addr.print( ostr );
+}
+

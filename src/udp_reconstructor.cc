@@ -63,7 +63,8 @@ void UDPReconstructor::collect_from_tunnel( const char* buffer, int buflen )
         }
         else if( reconstructed_packets.empty() )
         {
-            std::cerr << __PRETTY_FUNCTION__ << " Programming Error: not waiting for a length field but not incomplete UDP packet in the queue, either" << std::endl;
+            std::cerr << __FILE__ << ":" << __LINE__
+                      << " Programming Error: not waiting for a length field but no incomplete UDP packet in the queue, either" << std::endl;
             exit( -1 );
         }
         else
@@ -105,6 +106,10 @@ void UDPReconstructor::sendLoop( UDPSocket& udp_forwarder, const SockAddr& dest 
              */
             write_blocked = true;
             break;
+        }
+        else
+        {
+            reconstructed_packets.erase( reconstructed_packets.begin() );
         }
     }
 }

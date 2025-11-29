@@ -125,16 +125,22 @@ int UDPSocket::recv( char* buffer, size_t buflen )
 
 int UDPSocket::send( const char* buffer, size_t buflen, const SockAddr& dest )
 {
-    // std::cout << "Sending " << buflen << " bytes from UDP packets port " << _port << std::endl;
+    if( buffer == nullptr )
+    {
+        std::cerr << __PRETTY_FUNCTION__ << " calling with buffer that is NULL" << std::endl;
+        return -1;
+    }
+
+    std::cout << "Sending " << buflen << " bytes from UDP packets port " << _port << std::endl;
 
     int bytesSent = sendto( _sock, buffer, buflen, 0, dest.get(), dest.size() );
     if (bytesSent < 0)
     {
-        std::cerr << __PRETTY_FUNCTION__ << "sendto " << dest.size() << " bytes failed: " << strerror(errno) << std::endl;
+        std::cerr << __PRETTY_FUNCTION__ << " sendto " << buflen << " bytes to " << dest << " failed: " << strerror(errno) << std::endl;
         return bytesSent;
     }
 
-    // std::cout << "Sent " << bytesSent << " bytes to " << dest.getAddress() << ":" << dest.getPort() << std::endl;
+    std::cout << "Sent " << bytesSent << " bytes to " << dest.getAddress() << ":" << dest.getPort() << std::endl;
     return bytesSent;
 }
 
