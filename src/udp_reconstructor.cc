@@ -11,75 +11,83 @@ void UDPReconstructor::setNoBlock( UDPSocket& write_socket )
     write_socket.setNoBlock();
 }
 
+#define CERR if(verbose) std::cerr << __FILE__ << ":" << __LINE__
+
 void UDPReconstructor::collect_from_tunnel( const char* buffer, int buflen )
 {
-    if(verbose)
-        std::cerr << "    Appending " << buflen << " bytes to reconstruction buffer" << std::endl
-                  << "    Bytes before appending: " << bytes_from_tunnel.size() << std::endl;
+    CERR << " Appending " << buflen << " bytes to reconstruction buffer" << std::endl
+            << "        Bytes before appending: " << _bytes_from_tunnel.size() << std::endl;
 
-    bytes_from_tunnel.insert( bytes_from_tunnel.end(), buffer, buffer+buflen );
+    _bytes_from_tunnel.insert( _bytes_from_tunnel.end(), buffer, buffer+buflen );
 
-    if(verbose)
-        std::cerr << "    Bytes after appending: " << bytes_from_tunnel.size() << std::endl;
+    CERR << " Bytes after appending: " << _bytes_from_tunnel.size() << std::endl;
 
-    while( !bytes_from_tunnel.empty() )
+    while( !_bytes_from_tunnel.empty() )
     {
-        if(verbose)
-            std::cerr << "    reconstruction buffer contains "
-                      << bytes_from_tunnel.size() << " bytes" << std::endl;
-        if( wait_for_length ) // waiting for a length indicator from the tunnel
-        {
-            if(verbose)
-                std::cerr << "    waiting for length field" << std::endl;
+        CERR << " reconstruction buffer contains "
+             << _bytes_from_tunnel.size() << " bytes" << std::endl;
 
-            if( bytes_from_tunnel.size() >= sizeof(uint32_t) )
+        if( _wait_for_length ) // waiting for a length indicator from the tunnel
+        {
+            if( _bytes_from_tunnel.size() >= sizeof(uint32_t) )
             {
-                if(verbose)
-                    std::cerr << "    taking length field from reconstruction buffer" << std::endl;
+                CERR << " taking length field from reconstruction buffer" << std::endl;
 
                 // read the length field and convert it to host byte order
                 uint32_t length;
-                memcpy( &length, bytes_from_tunnel.data(), sizeof(uint32_t) );
+                memcpy( &length, _bytes_from_tunnel.data(), sizeof(uint32_t) );
                 length = ntohl( length );
 
-                if(verbose)
-                    std::cerr << "    expecting " << length << " bytes for next UDP packet" << std::endl;
+                CERR << " expecting " << length << " bytes for next UDP packet" << std::endl;
 
                 // erase the 4 consumed bytes from the buffer
-                auto it = bytes_from_tunnel.begin();
-                bytes_from_tunnel.erase( it, it+sizeof(uint32_t) );
+                auto it = _bytes_from_tunnel.begin();
+                _bytes_from_tunnel.erase( it, it+sizeof(uint32_t) );
 
+#if 0
                 // Put an incomplete UDP packet into the packet queue
                 reconstructed_packets.emplace_back( UDPPacket( length ) );
-                if(verbose) std::cerr << "    UDP packet created and inserted" << std::endl;
+                CERR << " empty UDP packet created and inserted" << std::endl;
+#endif
 
-                wait_for_length = false;
+                _wait_for_data   = length;
+                _wait_for_length = false;
             }
             else
             {
+                CERR << " no length field yet, waiting" << std::endl;
                 // not enough received, go back to dispatch loop
                 break;
             }
         }
-        else if( reconstructed_packets.empty() )
+        else if( _bytes_from_tunnel.size() >= _wait_for_data )
         {
-            std::cerr << __FILE__ << ":" << __LINE__
-                      << " Programming Error: not waiting for a length field but no incomplete UDP packet in the queue, either" << std::endl;
-            exit( -1 );
+            CERR << " waiting for " << _wait_for_data << " bytes, have " << _bytes_from_tunnel.size() << " in bytter" << std::endl;
+
+            UDPPacket pkt( _wait_for_data );
+            bool packet_complete = pkt.append( _bytes_from_tunnel );
+            if( !packet_complete )
+            {
+                std::cerr << __FILE__ << ":" << __LINE__ << " Programming error: created UDP packet is incomplete although we have enough data" << std::endl;
+                exit( -1 );
+            }
+
+            CERR << " a packet of size " << pkt.size() << " is complete" << std::endl;
+            reconstructed_packets.emplace_back( pkt );
+            _wait_for_length = true;
+            _wait_for_data   = 0;
+
+            CERR << " bytes still in reconstructions buffer: " << _bytes_from_tunnel.size() << std::endl;
+        }
+        else if( _bytes_from_tunnel.empty() )
+        {
+            CERR << " received buffer on tunnel output is empty" << std::endl;
+            break;
         }
         else
         {
-            if(verbose)
-                std::cerr << "    waiting for data, appending from bytes_from_tunnel.size()" << std::endl;
-
-            bool packet_complete = reconstructed_packets.back().append( bytes_from_tunnel );
-            if( packet_complete )
-            {
-                std::cerr << "    a packet of size " << reconstructed_packets.back().size() << " is complete" << std::endl;
-                wait_for_length = true;
-            }
-            if(verbose)
-                std::cerr << "    bytes still in reconstructions buffer: " << bytes_from_tunnel.size() << std::endl;
+            CERR << " waiting for " << _wait_for_data << " bytes, have only " << _bytes_from_tunnel.size() << std::endl;
+            break;
         }
     }
 }

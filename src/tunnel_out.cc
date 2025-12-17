@@ -20,7 +20,9 @@ int main( int argc, char* argv[] )
 
     callArgParse( argc, argv, args );
 
-    std::cout << "= ==== TunnelOut ====" << std::endl;
+    std::cerr << "= ===================" << std::endl;
+    std::cerr << "= ==== TunnelOut ====" << std::endl;
+    std::cerr << "= ===================" << std::endl;
     std::cout << "= Press Q<ret> to quit" << std::endl;
 
     TCPSocket tunnel( args.tunnel_host, args.tunnel_port );
@@ -32,7 +34,7 @@ int main( int argc, char* argv[] )
         return -1;
     }
 
-    std::cout << "= Connected to " << args.tunnel_host << ":" << args.tunnel_port
+    std::cerr << "= Connected to " << args.tunnel_host << ":" << args.tunnel_port
               << " on socket " << tunnel.socket() << std::endl;
 
     UDPSocket udp_forwarder;

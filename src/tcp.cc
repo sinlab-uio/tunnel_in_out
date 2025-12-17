@@ -151,31 +151,31 @@ int TCPSocket::socket() const
 
 int TCPSocket::recv( char* buffer, size_t buflen )
 {
-    std::cout << "Waiting for TCP data on port " << _port << std::endl;
+    std::cout << __FILE__ << ":" << __LINE__ << " wait for data on TCP socket " << _sock << ", port " << _port << " (up to " << buflen-1 << " bytes)" << std::endl;
 
     int bytesReceived = ::read( _sock, buffer, buflen-1 );
     if (bytesReceived < 0)
     {
-        std::cerr << __PRETTY_FUNCTION__ << "read failed" << std::endl;
+        std::cerr << __FILE__ << ":" << __LINE__ << " failed to read from TCP socket " << _sock << " with error msg " << strerror(errno) << std::endl;
         return bytesReceived;
     }
 
-    std::cout << __PRETTY_FUNCTION__ << " read " << bytesReceived << " bytes from socket " << _sock << std::endl;
+    std::cout << __FILE__ << ":" << __LINE__ << " read " << bytesReceived << " bytes from TCP socket " << _sock << std::endl;
     return bytesReceived;
 }
 
 int TCPSocket::send( const void* buffer, size_t buflen )
 {
-    std::cout << "Sending " << buflen << " bytes on TCP socket " << _sock << std::endl;
+    std::cout << __FILE__ << ":" << __LINE__ << " sending " << buflen << " bytes on TCP socket " << _sock << std::endl;
 
     int bytesSent = ::write( _sock, buffer, buflen );
     if (bytesSent < 0)
     {
-        std::cerr << __PRETTY_FUNCTION__ << "write failed" << std::endl;
+        std::cerr << __FILE__ << ":" << __LINE__ << " failed to send " << buflen << " bytes on TCP socket " << _sock << " with error msg " << strerror(errno) << std::endl;
         return bytesSent;
     }
 
-    std::cout << __PRETTY_FUNCTION__ << " wrote " << bytesSent << " bytes to socket " << _sock << std::endl;
+    std::cout << __FILE__ << ":" << __LINE__ << " sent " << bytesSent << " bytes on TCP socket " << _sock << std::endl;
     return bytesSent;
 }
 

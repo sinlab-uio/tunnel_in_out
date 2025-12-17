@@ -10,8 +10,8 @@
 
 #include "tunnel_in_dispatch.h"
 #include "sockaddr.h"
-// #include "udp.h"
-// #include "tcp.h"
+
+#define CERR std::cerr << __FILE__ << ":" << __LINE__
 
 static const size_t max_buffer_size = 100000;
 
@@ -104,26 +104,28 @@ void dispatch_loop( TCPSocket& tunnel_listener,
             retval = outside_udp.recv( udp_packet_buffer, max_buffer_size );
             if( retval < 0 )
             {
-                std::cerr << "Read from outside UDP socket failed. " << strerror(errno) << std::endl;
+                CERR << " Read from outside UDP socket failed. " << strerror(errno) << std::endl;
             }
             else if( retval == 0 )
             {
-                std::cerr << "recv on outside UDP socket " << outside_udp.socket() 
-                          << " returned " << retval << std::endl;
+                CERR << "recv on outside UDP socket " << outside_udp.socket() 
+                     << " returned " << retval << std::endl;
             }
             else
             {
-                std::cout << "= Received a packet (" << retval << " bytes) on outside UDP port "
-                          << outside_udp.getPort() << ", socket " << outside_udp.socket() << std::endl;
+                CERR << " Received a packet (" << retval << " bytes) on outside UDP port "
+                     << outside_udp.getPort() << ", socket " << outside_udp.socket() << std::endl;
                 if( tunnel )
                 {
                     uint32_t pkt_len = htonl( retval );
+                    CERR << " Sending packet len " << retval << " on TCP" << std::endl;
                     tunnel->send( &pkt_len, sizeof(uint32_t) ); // size is always 4
+                    CERR << " Sending " << retval << " bytes on TCP" << std::endl;
                     tunnel->send( udp_packet_buffer, retval );
                 }
                 else
                 {
-                    std::cerr << "    tunnel to TunnelIn isn't established. Drop UDP packets." << std::endl;
+                    CERR << " Tunnel to TunnelIn isn't established. Drop UDP packets." << std::endl;
                 }
             }
         }
@@ -133,7 +135,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
             int retval = tunnel->recv( tcp_tunnel_buffer, max_buffer_size );
             if( retval == 0 )
             {
-                std::cerr << "Reading from TCP tunnel returned 0. Broken connection? Quitting." << std::endl;
+                CERR << "Reading from TCP tunnel returned 0. Broken connection? Quitting." << std::endl;
                 cont_loop = false;
             }
         }
