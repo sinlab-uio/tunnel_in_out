@@ -38,31 +38,36 @@ int main( int argc, char* argv[] )
 
     buffer[0] = 0;
     strcpy( buffer, "Hello world!" );
-
     glove.send( buffer, strlen(buffer), dest );
 
     buffer[0] = 0;
-    strcat( buffer, "abcdefghijklmnopqrstuvwxy" );
-    strcat( buffer, "abcdefghijklmnopqrstuvwxy" );
-    strcat( buffer, "abcdefghijklmnopqrstuvwxy" );
-    strcat( buffer, "abcdefghijklmnopqrstuvwxy" );
-
+    while( strlen(buffer)<100 ) strncat( buffer, "100,", 10000 ); 
+    buffer[99] = '\n';
+    buffer[100] = 0;
     glove.send( buffer, strlen(buffer), dest );
 
-    for( int i=0; i<9*4; i++ ) strcat( buffer, "abcdefghijklmnopqrstuvwxy" );
-
+    buffer[0] = 0;
+    while( strlen(buffer)<500 ) strncat( buffer, "500,", 10000 ); 
+    buffer[499] = '\n';
+    buffer[500] = 0;
     glove.send( buffer, strlen(buffer), dest );
 
     /* 2000 bytes in the buffer. This is too big for a UDP packet unless the
      * network supports jumbograms.
      */
-    for( int i=0; i<10*4; i++ ) strcat( buffer, "abcdefghijklmnopqrstuvwxy" );
+    buffer[0] = 0;
+    while( strlen(buffer)<2000 ) strncat( buffer, "2000,", 10000 ); 
+    buffer[1999] = '\n';
+    buffer[2000] = 0;
     glove.send( buffer, strlen(buffer), dest );
 
     /* 9000 bytes in the buffer. This is too big for a UDP packet unless the
      * network supports jumbograms.
      */
-    for( int i=0; i<7*10*4; i++ ) strcat( buffer, "abcdefghijklmnopqrstuvwxy" );
+    buffer[0] = 0;
+    while( strlen(buffer)<9000 ) strncat( buffer, "9000,", 10000 ); 
+    buffer[8999] = '\n';
+    buffer[9000] = 0;
     glove.send( buffer, strlen(buffer), dest );
 
     if( args.send_too_long )
@@ -70,8 +75,15 @@ int main( int argc, char* argv[] )
         /* 10000 bytes in the buffer.
          * This is guaranteed too big for a UDP packet.
          */
-        for( int i=0; i<10*4; i++ ) strcat( buffer, "abcdefghijklmnopqrstuvwxy" );
+        buffer[0] = 0;
+        while( strlen(buffer)<10000 ) strncat( buffer, "10000,", 10000 ); 
+        buffer[9999] = '\n';
+        buffer[10000] = 0;
         glove.send( buffer, strlen(buffer), dest );
     }
+
+    buffer[0] = 0;
+    strcpy( buffer, "Bye world!" );
+    glove.send( buffer, strlen(buffer), dest );
 }
 
