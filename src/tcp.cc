@@ -1,15 +1,9 @@
-// #include <iostream>
-// #include <string>
-// #include <vector>
-// #include <cstring> // For memset
-
 #include <sys/types.h>
 #include <sys/socket.h>
-// #include <netinet/in.h>
-// #include <arpa/inet.h>
+
+#include <fcntl.h>
 #include <unistd.h> // for close
 #include <string.h> // for strerror
-// #include <errno.h>  // for errno
 
 #include "sockaddr.h"
 #include "tcp.h"
@@ -147,6 +141,19 @@ void TCPSocket::destroy( )
 int TCPSocket::socket() const
 {
     return _sock;
+}
+
+void TCPSocket::setNoBlock( )
+{
+    /* In attempting to set the socket non-blocking, we ignore
+     * error because we cannot do anything about them anyway.
+     */
+    int flags = fcntl( _sock, F_GETFL, 0 );
+    if( flags == -1 ) return;
+
+    flags |= O_NONBLOCK;
+
+    fcntl( _sock, F_SETFL, flags );
 }
 
 int TCPSocket::recv( char* buffer, size_t buflen )

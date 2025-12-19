@@ -65,6 +65,9 @@ public:
     // Integer value of the socket
     int socket() const;
 
+    // Set this socket to non-blocking. Important for TCP forwarding.
+    void setNoBlock( );
+
     /* Returns the _port variable. It is not guaranteed that this is
      * the port number that getsockname would return.
      */

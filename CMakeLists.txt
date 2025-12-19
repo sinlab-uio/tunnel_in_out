@@ -44,6 +44,7 @@ add_library( tunnelNet
 	src/sockaddr.cc src/sockaddr.h
 	src/udp.cc src/udp.h
 	src/tcp.cc src/tcp.h
+	src/generic_argp.cc src/generic_argp.h
 	)
 
 add_executable( TunnelIn src/tunnel_in.cc

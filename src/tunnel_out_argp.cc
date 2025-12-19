@@ -3,20 +3,19 @@
 
 #include <stdint.h>
 #include <argp.h>
+#include "generic_argp.h"
 #include "tunnel_out_argp.h"
 
 const char *argp_program_version = "tunnel_out 0.1";
 const char *argp_program_bug_address = "griff@uio.no";
 static char doc[] = "\n"
                     "TunnelOut runs on the inside of a firewall. It connects actively to TunnelIn. "
-                    "After that, it provides user-space splicing of a specified TCP connection and turns data arriving the tunnel back into UDP packets.\n";
-static char args_doc[] = " <tunnel-host> <tunnel-port>";
+                    "After that, it provides user-space splicing of a specified TCP connection and turns data arriving the tunnel back into UDP packets.\n"
+                    "  <tunnel-rl>\tThe URL, hostname:port or 'dotted decimal address':port of the TunnelIn machine.\n";
+static char args_doc[] = "<tunnel-url>";
 static struct argp_option options[] = {
-    { "<tunnel-host>",  1, "string", OPTION_DOC, "The hostname or dotted decimal address of the TunnelIn machine."},
-    { "<tunnel-port>",  2, "int",    OPTION_DOC, "TCP listening port of the TunnelIn process."},
-    { "fwd-host",     'f', "string", 0, "(mandatory) The hostname or dotted decimal address of the local machine."},
-    { "fwd-udp",      'u', "int",    0, "(mandatory) The UDP port of the local machine."},
-    { "fwd-tcp",      't', "int",    0, "(mandatory) The TCP listener port on the local machine."},
+    { "fwd-udp",      'u', "string",    0, "(mandatory) The UDP URL of the local machine."},
+    { "fwd-tcp",      't', "string",    0, "(mandatory) The TCP URL of the local machine."},
     { 0 }
 };
 
@@ -26,23 +25,44 @@ static error_t parse_opt( int key, char *arg, struct argp_state *state )
 
     switch( key )
     {
-    case 'f':
-        args->forward_host = arg;
-        break;
     case 'u':
-        args->forward_udp_port = atoi( arg );
+        {
+            args->forward_udp_host = arg;
+            const int port = extractPort( args->forward_udp_host );
+            if( port < 0 )
+            {
+                std::cerr << "UDP URL does not contain a port" << std::endl;
+                return 0;
+            }
+            args->forward_udp_port = port;
+        }
         break;
     case 't':
-        args->forward_tcp_port = atoi( arg );
+        {
+            args->forward_tcp_host = arg;
+            const int port = extractPort( args->forward_tcp_host );
+            if( port < 0 )
+            {
+                std::cerr << "TCP URL does not contain a port" << std::endl;
+                return 0;
+            }
+            args->forward_tcp_port = port;
+        }
         break;
     case ARGP_KEY_ARG:
         switch( state->arg_num )
         {
         case 0:
-            args->tunnel_host = arg;
-            break;
-        case 1:
-            args->tunnel_port = atoi(arg);
+            {
+                args->tunnel_host = arg;
+                const int port = extractPort( args->tunnel_host );
+                if( port < 0 )
+                {
+                    std::cerr << "URL of the positional command line argument does not contain a port" << std::endl;
+                    return 0;
+                }
+                args->tunnel_port = port;
+            }
             break;
         default :
             std::cerr << "Positional command line argument " << state->arg_num << " value " << arg << std::endl;
@@ -56,10 +76,6 @@ static error_t parse_opt( int key, char *arg, struct argp_state *state )
         if (args->tunnel_port == 0)
         {
             argp_error( state, "Positional option <tunnel-port> is missing.");
-        }
-        if (args->forward_host == "")
-        {
-            argp_error( state, "Mandatory option --fwd-host (-f) is missing.");
         }
         if (args->forward_udp_port == 0)
         {

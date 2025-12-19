@@ -8,10 +8,11 @@
 
 const char *argp_program_version = "tunnel_in 0.1";
 const char *argp_program_bug_address = "griff@uio.no";
+// static char args_doc[] = " <tunnel-port>"; // "[FILENAME]...";
 static char doc[] = "\n"
                     "TunnelIn runs on the outside of a firewall. It waits passively for TunnelOut to connect to it. "
                     "After that, it will provide a user-space splicing of the specified TCP connections and a TCP tunnel for the specified UDP ports.\n";
-static char args_doc[] = " <tunnel-port>"; // "[FILENAME]...";
+static char* args_doc = doc;
 static struct argp_option options[] = {
     { "<tunnel-port>",  1, "int", OPTION_DOC, "TCP listening port of this tunnel."},
     { "udp",          'u', "int", 0, "(mandatory) The UDP port to which TunnelIn will listen for packets from the outside."},

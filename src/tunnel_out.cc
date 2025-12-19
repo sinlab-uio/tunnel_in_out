@@ -48,8 +48,8 @@ int main( int argc, char* argv[] )
 
     std::shared_ptr<TCPSocket> webSock;
 
-    SockAddr dest_udp( args.forward_host.c_str(), args.forward_udp_port );
-    SockAddr dest_tcp( args.forward_host.c_str(), args.forward_tcp_port );
+    SockAddr dest_udp( args.forward_udp_host.c_str(), args.forward_udp_port );
+    SockAddr dest_tcp( args.forward_tcp_host.c_str(), args.forward_tcp_port );
 
     dispatch_loop( tunnel, udp_forwarder, webSock, dest_udp, dest_tcp );
 }

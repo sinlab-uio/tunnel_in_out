@@ -2,19 +2,21 @@
 #include <string>
 
 #include <argp.h>
+#include "generic_argp.h"
 #include "outside_udp_argp.h"
 
 const char *argp_program_version = "outside_udp 0.1";
 const char *argp_program_bug_address = "griff@uio.no";
 static char doc[] = "\n"
-                    "OutsideUDP runs on the outside of a firewall. It sends dummy UDP packets to TunnelIn.\n";
-static char args_doc[] = " <tunnel-host> <tunnel-port>";
+                    "OutsideUDP runs on the outside of a firewall. It sends dummy UDP packets to TunnelIn.\n"
+                    "  <tunnel-url>\tthe hostname:port or 'dotted decimal address':port pointing to the TunnelIn machine.\n";
+static char args_doc[] = "<tunnel-url>";
 static struct argp_option options[] = {
-    { "<tunnel-host>", 1, "string", OPTION_DOC, "The hostname or dotted decimal address of the TunnelIn machine."},
-    { "<tunnel-port>", 2, "int",    OPTION_DOC, "TCP listening port of the TunnelIn process."},
     { "send-too-long", 'x', 0, 0, "Optional, attempt to send 10000-byte packet."},
     { 0 }
 };
+
+// #define CERR std::cerr << __FILE__ << ":" << __LINE__ << " "
 
 static error_t parse_opt( int key, char *arg, struct argp_state *state )
 {
@@ -29,10 +31,16 @@ static error_t parse_opt( int key, char *arg, struct argp_state *state )
         switch( state->arg_num )
         {
         case 0:
-            args->tunnel_host = arg;
-            break;
-        case 1:
-            args->tunnel_port = atoi(arg);
+            {
+                args->tunnel_host = arg;
+                int port = extractPort( args->tunnel_host );
+                if( port < 0 )
+                {
+                    argp_error( state, "Positional option <tunnel-url> is missing or incorrect.");
+                    return 0;
+                }
+                args->tunnel_port = port;
+            }
             break;
         default :
             std::cerr << "Positional command line argument " << state->arg_num << " value " << arg << std::endl;
@@ -41,11 +49,11 @@ static error_t parse_opt( int key, char *arg, struct argp_state *state )
     case ARGP_KEY_END:
         if (args->tunnel_host == "")
         {
-            argp_error( state, "Positional option <tunnel-host> is missing.");
+            argp_error( state, "Positional option <tunnel-url> is missing.");
         }
         if (args->tunnel_port == 0)
         {
-            argp_error( state, "Positional option <tunnel-port> is missing.");
+            argp_error( state, "Positional option <tunnel-url> is missing or incorrect.");
         }
         return 0;
     default:
