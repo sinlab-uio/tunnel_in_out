@@ -6,22 +6,24 @@
 #include <sstream>
 
 #include <sys/select.h>
-#include <unistd.h> // for close
-#include <string.h> // for strerror
+#include <unistd.h>
+#include <string.h>
 #include <errno.h>
 
 #include "tunnel_server_dispatch.h"
 #include "tunnel_protocol.h"
 #include "tunnel_message_reconstructor.h"
+#include "tcp_connection_manager.h"
 #include "sockaddr.h"
 #include "verbose.h"
 
 static const size_t max_buffer_size = 100000;
-static const size_t max_udp_packet_size = 65536; // Standard max UDP packet size
+static const size_t max_udp_packet_size = 65536;
+static const size_t max_tcp_data_size = 16384;  // 16KB per TCP read
 
 // Buffers
 static char udp_packet_buffer[max_udp_packet_size];
-static char tcp_websock_buffer[max_buffer_size];
+static char tcp_data_buffer[max_tcp_data_size];
 static char tcp_tunnel_buffer[max_buffer_size];
 
 // Helper function to send a tunnel message
@@ -87,6 +89,9 @@ void dispatch_loop( TCPSocket& tunnel_listener,
     
     // Message reconstructor for parsing messages from TunnelClient
     TunnelMessageReconstructor reconstructor;
+    
+    // TCP connection manager for multiplexing TCP connections
+    TCPConnectionManager tcp_connections;
 
     while( cont_loop )
     {
@@ -101,6 +106,16 @@ void dispatch_loop( TCPSocket& tunnel_listener,
             FD_SET( it, &fds );
             fd_max = std::max( fd_max, it );
         }
+        
+        // Add all TCP connection sockets
+        auto tcp_sockets = tcp_connections.getAllSockets();
+        for (int sock : tcp_sockets)
+        {
+            ostr << sock << " ";
+            FD_SET( sock, &fds );
+            fd_max = std::max( fd_max, sock );
+        }
+        
         LOG_DEBUG << ostr.str() << std::endl;
 
         int retval = ::select( fd_max + 1, &fds, nullptr, nullptr, nullptr );
@@ -159,29 +174,46 @@ void dispatch_loop( TCPSocket& tunnel_listener,
 
         if( FD_ISSET( outside_tcp_listener.socket(), &fds ) )
         {
-            /* Accept new TCP connection from outside */
+            // New TCP connection from outside
             std::shared_ptr<TCPSocket> tcp_conn( new TCPSocket( outside_tcp_listener ) );
             if( tcp_conn->valid() )
             {
-                // For now, we only support one outside TCP connection
-                // In future: multiple connections with conn_id management
-                if (webSock && webSock->valid())
+                // Set non-blocking to avoid delaying UDP
+                tcp_conn->setNoBlock();
+                
+                if (tunnel && tunnel->valid())
                 {
-                    std::cout << "= Replacing existing outside TCP connection" << std::endl;
-                    // Remove old socket from list
-                    auto it = std::find(sockets.begin(), sockets.end(), webSock->socket());
-                    if (it != sockets.end())
+                    // Allocate connection ID
+                    uint32_t conn_id = tcp_connections.allocateConnId();
+                    
+                    LOG_INFO << "Outside TCP connection accepted on socket " 
+                              << tcp_conn->socket() << ", assigned conn_id=" << conn_id << std::endl;
+                    
+                    // Add to connection manager
+                    tcp_connections.addConnection(conn_id, tcp_conn);
+                    
+                    // Send TCP_OPEN message through tunnel
+                    bool success = sendTunnelMessage(*tunnel, 
+                                                     conn_id,
+                                                     TunnelMessageType::TCP_OPEN,
+                                                     nullptr,
+                                                     0);
+                    
+                    if (success)
                     {
-                        sockets.erase(it);
+                        LOG_DEBUG << "Sent TCP_OPEN for conn_id=" << conn_id << std::endl;
+                    }
+                    else
+                    {
+                        LOG_ERROR << "Failed to send TCP_OPEN for conn_id=" << conn_id << std::endl;
+                        tcp_connections.removeConnection(conn_id);
                     }
                 }
-                
-                webSock.swap( tcp_conn );
-                sockets.push_back( webSock->socket() );
-                std::cout << "= Outside TCP connection established on socket " 
-                          << webSock->socket() << std::endl;
-                
-                // TODO: Send TCP_OPEN message through tunnel when TCP support is implemented
+                else
+                {
+                    LOG_WARN << "Outside TCP connection received but tunnel not established. Rejecting." << std::endl;
+                    // tcp_conn will be automatically closed when shared_ptr goes out of scope
+                }
             }
         }
 
@@ -199,7 +231,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
             }
             else
             {
-                LOG_DEBUG << " Received UDP packet (" << retval << " bytes) from " 
+                LOG_DEBUG << "Received UDP packet (" << retval << " bytes) from " 
                           << last_udp_sender.getAddress() << ":" << last_udp_sender.getPort() << std::endl;
                 
                 // Remember this sender for future responses
@@ -217,8 +249,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                     
                     if (!success)
                     {
-                        LOG_WARN << " Failed to send UDP packet through tunnel. Connection broken?" << std::endl;
-                        // Remove tunnel from socket list
+                        LOG_WARN << "Failed to send UDP packet through tunnel. Connection broken?" << std::endl;
                         auto it = std::find(sockets.begin(), sockets.end(), tunnel->socket());
                         if (it != sockets.end())
                         {
@@ -229,7 +260,71 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                 }
                 else
                 {
-                    LOG_WARN << "Tunnel to TunnelClient isn't established. Drop UDP packets." << std::endl;
+                    LOG_INFO << "Tunnel to TunnelClient isn't established. Drop UDP packets." << std::endl;
+                }
+            }
+        }
+
+        // Check all TCP connections from outside for data
+        for (uint32_t conn_id : tcp_connections.getAllConnIds())
+        {
+            auto* conn = tcp_connections.getConnection(conn_id);
+            if (!conn || !conn->socket || !conn->valid)
+                continue;
+                
+            if (FD_ISSET(conn->socket->socket(), &fds))
+            {
+                int bytes = conn->socket->recv(tcp_data_buffer, max_tcp_data_size);
+                
+                if (bytes == 0)
+                {
+                    // Connection closed by peer
+                    LOG_INFO << "Outside TCP connection closed by peer, conn_id=" << conn_id << std::endl;
+                    
+                    if (tunnel && tunnel->valid())
+                    {
+                        sendTunnelMessage(*tunnel, conn_id, TunnelMessageType::TCP_CLOSE, nullptr, 0);
+                    }
+                    
+                    tcp_connections.removeConnection(conn_id);
+                }
+                else if (bytes < 0)
+                {
+                    if (errno == EAGAIN || errno == EWOULDBLOCK)
+                    {
+                        // Non-blocking socket, no data available
+                        continue;
+                    }
+                    
+                    LOG_WARN << "Error reading from outside TCP conn_id=" << conn_id 
+                             << ": " << strerror(errno) << std::endl;
+                    
+                    if (tunnel && tunnel->valid())
+                    {
+                        sendTunnelMessage(*tunnel, conn_id, TunnelMessageType::TCP_CLOSE, nullptr, 0);
+                    }
+                    
+                    tcp_connections.removeConnection(conn_id);
+                }
+                else
+                {
+                    // Data received
+                    LOG_DEBUG << "Received " << bytes << " bytes from outside TCP conn_id=" << conn_id << std::endl;
+                    
+                    if (tunnel && tunnel->valid())
+                    {
+                        bool success = sendTunnelMessage(*tunnel, 
+                                                         conn_id,
+                                                         TunnelMessageType::TCP_DATA,
+                                                         tcp_data_buffer,
+                                                         bytes);
+                        
+                        if (!success)
+                        {
+                            LOG_ERROR << "Failed to send TCP_DATA for conn_id=" << conn_id << std::endl;
+                            tcp_connections.removeConnection(conn_id);
+                        }
+                    }
                 }
             }
         }
@@ -300,8 +395,8 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                                     }
                                     else
                                     {
-                                        LOG_WARN << "Error forwarding UDP response: " 
-                                                 << strerror(errno) << std::endl;
+                                        LOG_ERROR << "Error forwarding UDP response: " 
+                                                  << strerror(errno) << std::endl;
                                     }
                                 }
                             }
@@ -313,49 +408,54 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                             break;
                         }
                         
-                        case TunnelMessageType::TCP_OPEN:
                         case TunnelMessageType::TCP_DATA:
+                        {
+                            auto* conn = tcp_connections.getConnection(msg.conn_id);
+                            if (conn && conn->socket && conn->valid)
+                            {
+                                int sent = conn->socket->send(msg.payload.data(), msg.payload.size());
+                                if (sent < 0)
+                                {
+                                    LOG_WARN << "Failed to send TCP data to conn_id=" 
+                                             << msg.conn_id << std::endl;
+                                    tcp_connections.removeConnection(msg.conn_id);
+                                    sendTunnelMessage(*tunnel, msg.conn_id, 
+                                                     TunnelMessageType::TCP_CLOSE, nullptr, 0);
+                                }
+                                else
+                                {
+                                    LOG_DEBUG << "Forwarded " << sent 
+                                              << " bytes to outside TCP conn_id=" << msg.conn_id << std::endl;
+                                }
+                            }
+                            else
+                            {
+                                LOG_WARN << "Received TCP_DATA for unknown conn_id=" << msg.conn_id << std::endl;
+                            }
+                            break;
+                        }
+                        
                         case TunnelMessageType::TCP_CLOSE:
                         {
-                            LOG_INFO << "TODO: Handle TCP message type " 
-                                     << TunnelProtocol::messageTypeToString(msg.type) << std::endl;
+                            LOG_INFO << "Received TCP_CLOSE for conn_id=" << msg.conn_id << std::endl;
+                            tcp_connections.removeConnection(msg.conn_id);
+                            break;
+                        }
+                        
+                        case TunnelMessageType::TCP_OPEN:
+                        {
+                            LOG_WARN << "Unexpected TCP_OPEN from client for conn_id=" << msg.conn_id << std::endl;
                             break;
                         }
                         
                         default:
-                            LOG_ERROR << "Unknown message type: " 
-                                      << static_cast<int>(msg.type) << std::endl;
+                            LOG_ERROR << "Unknown message type: " << static_cast<int>(msg.type) << std::endl;
                             break;
                     }
                     
                     // Remove processed message
                     reconstructor.popMessage();
                 }
-            }
-        }
-
-        if( webSock && FD_ISSET( webSock->socket(), &fds ) )
-        {
-            int retval = webSock->recv( tcp_websock_buffer, max_buffer_size );
-            if (retval <= 0)
-            {
-                LOG_WARN << "Outside TCP socket closed" << std::endl;
-                // Remove from socket list
-                auto it = std::find(sockets.begin(), sockets.end(), webSock->socket());
-                if (it != sockets.end())
-                {
-                    sockets.erase(it);
-                }
-                webSock.reset();
-                
-                // TODO: Send TCP_CLOSE message through tunnel when TCP support is implemented
-            }
-            else
-            {
-                // Data received on outside TCP connection
-                LOG_WARN << "Received " << retval << " bytes on outside TCP socket" << std::endl;
-                
-                // TODO: Send TCP_DATA message through tunnel when TCP support is implemented
             }
         }
     }

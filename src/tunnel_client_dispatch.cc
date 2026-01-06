@@ -6,24 +6,24 @@
 #include <algorithm>
 
 #include <sys/select.h>
-#include <unistd.h> // for close
-#include <string.h> // for strerror
+#include <unistd.h>
+#include <string.h>
 #include <errno.h>
 
 #include "tunnel_client_dispatch.h"
 #include "tunnel_protocol.h"
 #include "tunnel_message_reconstructor.h"
+#include "tcp_connection_manager.h"
 #include "sockaddr.h"
 #include "udp.h"
 #include "verbose.h"
 
 static const size_t max_buffer_size = 100000;
+static const size_t max_tcp_data_size = 16384;  // 16KB per TCP read
 
 char udp_packet_buffer[max_buffer_size];
-char tcp_websock_buffer[max_buffer_size];
+char tcp_data_buffer[max_tcp_data_size];
 char tcp_tunnel_buffer[max_buffer_size];
-
-static const bool verbose = false;
 
 TunnelMessageReconstructor reconstructor;
 
@@ -38,7 +38,7 @@ bool sendTunnelMessage(TCPSocket& tunnel,
     // Validate payload length
     if (payload_len > TunnelProtocol::MAX_PAYLOAD_SIZE)
     {
-        LOG_ERROR << "ERROR: Payload too large: " << payload_len << std::endl;
+        LOG_ERROR << "Payload too large: " << payload_len << std::endl;
         return false;
     }
     
@@ -50,8 +50,7 @@ bool sendTunnelMessage(TCPSocket& tunnel,
     int sent = tunnel.send(&header, TunnelProtocol::HEADER_SIZE);
     if (sent != TunnelProtocol::HEADER_SIZE)
     {
-        LOG_ERROR << __FILE__ << ":" << __LINE__ 
-                  << " Failed to send message header" << std::endl;
+        LOG_ERROR << "Failed to send message header" << std::endl;
         return false;
     }
     
@@ -61,8 +60,7 @@ bool sendTunnelMessage(TCPSocket& tunnel,
         sent = tunnel.send(payload, payload_len);
         if (sent != payload_len)
         {
-            LOG_ERROR << __FILE__ << ":" << __LINE__ 
-                      << " Failed to send message payload" << std::endl;
+            LOG_ERROR << "Failed to send message payload" << std::endl;
             return false;
         }
     }
@@ -80,20 +78,17 @@ void dispatch_loop( TCPSocket& tunnel,
     int    fd_max = 0;
     bool   cont_loop = true;
 
-    fd_set write_fds;
-
     std::vector<int> read_sockets;
     read_sockets.push_back( 0 ); // stdin
     read_sockets.push_back( tunnel.socket() );
     read_sockets.push_back( udp_forwarder.socket() );
     
+    // TCP connection manager for multiplexing TCP connections
+    TCPConnectionManager tcp_connections;
+
     while( cont_loop )
     {
-        std::vector<int> write_sockets;
-        // Note: Write blocking is now handled per-message, not globally
-
         FD_ZERO( &read_fds );
-        FD_ZERO( &write_fds );
 
         std::ostringstream ostr;
         ostr << "    call select with read fds ";
@@ -103,16 +98,28 @@ void dispatch_loop( TCPSocket& tunnel,
             FD_SET( it, &read_fds );
             fd_max = std::max( fd_max, it );
         }
-        ostr << ", write fds ";
-        for( auto it : write_sockets )
+        
+        // Add all TCP connection sockets
+        auto tcp_sockets = tcp_connections.getAllSockets();
+        for (int sock : tcp_sockets)
         {
-            ostr << it << " ";
-            FD_SET( it, &write_fds );
-            fd_max = std::max( fd_max, it );
+            ostr << sock << " ";
+            FD_SET( sock, &read_fds );
+            fd_max = std::max( fd_max, sock );
         }
         LOG_DEBUG << ostr.str() <<  std::endl;
 
-        int retval = ::select( fd_max+1, &read_fds, &write_fds, nullptr, nullptr );
+        int retval = ::select( fd_max+1, &read_fds, nullptr, nullptr, nullptr );
+
+        if (retval < 0)
+        {
+            if (errno == EINTR)
+            {
+                continue;
+            }
+            LOG_ERROR << "Select failed: " << strerror(errno) << std::endl;
+            break;
+        }
 
         if( FD_ISSET( 0, &read_fds ) )
         {
@@ -137,7 +144,7 @@ void dispatch_loop( TCPSocket& tunnel,
             }
             else if( retval == 0 )
             {
-                std::cout << "= Socket " << tunnel.socket() << " closed. Quitting." << std::endl;
+                LOG_INFO << "Socket " << tunnel.socket() << " closed. Quitting." << std::endl;
                 cont_loop = false;
             }
             else
@@ -159,7 +166,7 @@ void dispatch_loop( TCPSocket& tunnel,
                     {
                         case TunnelMessageType::UDP_PACKET:
                         {
-                            // Forward UDP packet to destination (request from outside)
+                            // Forward UDP packet to destination
                             if (msg.payload.size() > 0)
                             {
                                 int sent = udp_forwarder.send(msg.payload.data(), 
@@ -172,21 +179,19 @@ void dispatch_loop( TCPSocket& tunnel,
                                 }
                                 else if (errno == EWOULDBLOCK || errno == EAGAIN)
                                 {
-                                    LOG_DEBUG << "UDP socket would block - packet dropped" << std::endl;
-                                    // In future: could queue for retry
+                                    LOG_WARN << "UDP socket would block - packet dropped" << std::endl;
                                 }
                                 else
                                 {
-                                    LOG_ERROR << "Error forwarding UDP packet: " << strerror(errno) << std::endl;
+                                    LOG_ERROR << "Error forwarding UDP packet: " 
+                                              << strerror(errno) << std::endl;
                                 }
                             }
                             else
                             {
                                 // Zero-length UDP packet is valid
                                 LOG_DEBUG << "Forwarding zero-length UDP packet" << std::endl;
-                                int sent = udp_forwarder.send(msg.payload.data(), 
-                                                             0, 
-                                                             dest_udp);
+                                int sent = udp_forwarder.send(msg.payload.data(), 0, dest_udp);
                                 if (sent < 0)
                                 {
                                     LOG_ERROR << "Error forwarding zero-length UDP packet: " 
@@ -198,25 +203,69 @@ void dispatch_loop( TCPSocket& tunnel,
                         
                         case TunnelMessageType::TCP_OPEN:
                         {
-                            LOG_ERROR << "TODO: Handle TCP_OPEN for conn_id " 
-                                      << msg.conn_id << std::endl;
-                            // Future: Create outgoing TCP connection to dest_tcp
+                            LOG_INFO << "TCP_OPEN received for conn_id=" << msg.conn_id << std::endl;
+                            
+                            // Create outgoing TCP connection to destination
+                            std::shared_ptr<TCPSocket> tcp_conn(new TCPSocket(dest_tcp.getAddress().c_str(), 
+                                                                               dest_tcp.getPort()));
+                            
+                            if (tcp_conn->valid())
+                            {
+                                // Set non-blocking to avoid delaying UDP
+                                tcp_conn->setNoBlock();
+                                
+                                LOG_INFO << "Connected to " << dest_tcp.getAddress() 
+                                         << ":" << dest_tcp.getPort() 
+                                         << " for conn_id=" << msg.conn_id << std::endl;
+                                
+                                tcp_connections.addConnection(msg.conn_id, tcp_conn);
+                            }
+                            else
+                            {
+                                LOG_ERROR << "Failed to connect to " << dest_tcp.getAddress() 
+                                          << ":" << dest_tcp.getPort() 
+                                          << " for conn_id=" << msg.conn_id << std::endl;
+                                
+                                // Send TCP_CLOSE back to server
+                                sendTunnelMessage(tunnel, msg.conn_id, 
+                                                 TunnelMessageType::TCP_CLOSE, nullptr, 0);
+                            }
                             break;
                         }
                         
                         case TunnelMessageType::TCP_DATA:
                         {
-                            LOG_ERROR << "TODO: Handle TCP_DATA for conn_id " 
-                                      << msg.conn_id << std::endl;
-                            // Future: Forward data to corresponding TCP connection
+                            auto* conn = tcp_connections.getConnection(msg.conn_id);
+                            if (conn && conn->socket && conn->valid)
+                            {
+                                int sent = conn->socket->send(msg.payload.data(), msg.payload.size());
+                                if (sent < 0)
+                                {
+                                    LOG_WARN << "Failed to send TCP data to conn_id=" 
+                                             << msg.conn_id << std::endl;
+                                    tcp_connections.removeConnection(msg.conn_id);
+                                    sendTunnelMessage(tunnel, msg.conn_id, 
+                                                     TunnelMessageType::TCP_CLOSE, nullptr, 0);
+                                }
+                                else
+                                {
+                                    LOG_DEBUG << "Forwarded " << sent 
+                                              << " bytes to destination TCP conn_id=" << msg.conn_id << std::endl;
+                                }
+                            }
+                            else
+                            {
+                                LOG_WARN << "Received TCP_DATA for unknown conn_id=" << msg.conn_id << std::endl;
+                                sendTunnelMessage(tunnel, msg.conn_id, 
+                                                 TunnelMessageType::TCP_CLOSE, nullptr, 0);
+                            }
                             break;
                         }
                         
                         case TunnelMessageType::TCP_CLOSE:
                         {
-                            LOG_ERROR << "TODO: Handle TCP_CLOSE for conn_id " 
-                                      << msg.conn_id << std::endl;
-                            // Future: Close corresponding TCP connection
+                            LOG_INFO << "TCP_CLOSE received for conn_id=" << msg.conn_id << std::endl;
+                            tcp_connections.removeConnection(msg.conn_id);
                             break;
                         }
                         
@@ -260,8 +309,7 @@ void dispatch_loop( TCPSocket& tunnel,
                 }
                 else
                 {
-                    LOG_WARN << "Failed to send UDP response through tunnel" << std::endl;
-                    // Connection might be broken
+                    LOG_ERROR << "Failed to send UDP response through tunnel" << std::endl;
                     cont_loop = false;
                 }
             }
@@ -269,22 +317,66 @@ void dispatch_loop( TCPSocket& tunnel,
             {
                 if (errno != EWOULDBLOCK && errno != EAGAIN)
                 {
-                    LOG_WARN << "Error receiving UDP response: " << strerror(errno) << std::endl;
+                    LOG_ERROR << "Error receiving UDP response: " << strerror(errno) << std::endl;
                 }
             }
         }
 
-        if( webSock && FD_ISSET( webSock->socket(), &read_fds ) )
+        // Check all TCP connections to destination for data
+        for (uint32_t conn_id : tcp_connections.getAllConnIds())
         {
-            LOG_DEBUG << std::endl;
-            webSock->recv( tcp_websock_buffer, max_buffer_size );
-        }
-
-        if( FD_ISSET( udp_forwarder.socket(), &write_fds ) )
-        {
-            LOG_DEBUG << std::endl;
-            // Write unblocking handled per-message now
+            auto* conn = tcp_connections.getConnection(conn_id);
+            if (!conn || !conn->socket || !conn->valid)
+                continue;
+                
+            if (FD_ISSET(conn->socket->socket(), &read_fds))
+            {
+                int bytes = conn->socket->recv(tcp_data_buffer, max_tcp_data_size);
+                
+                if (bytes == 0)
+                {
+                    // Connection closed by destination
+                    LOG_INFO << "Destination TCP connection closed, conn_id=" << conn_id << std::endl;
+                    
+                    sendTunnelMessage(tunnel, conn_id, TunnelMessageType::TCP_CLOSE, nullptr, 0);
+                    tcp_connections.removeConnection(conn_id);
+                }
+                else if (bytes < 0)
+                {
+                    if (errno == EAGAIN || errno == EWOULDBLOCK)
+                    {
+                        // Non-blocking socket, no data available
+                        continue;
+                    }
+                    
+                    LOG_WARN << "Error reading from destination TCP conn_id=" << conn_id 
+                             << ": " << strerror(errno) << std::endl;
+                    
+                    sendTunnelMessage(tunnel, conn_id, TunnelMessageType::TCP_CLOSE, nullptr, 0);
+                    tcp_connections.removeConnection(conn_id);
+                }
+                else
+                {
+                    // Data received from destination
+                    LOG_DEBUG << "Received " << bytes << " bytes from destination TCP conn_id=" << conn_id << std::endl;
+                    
+                    bool success = sendTunnelMessage(tunnel, 
+                                                     conn_id,
+                                                     TunnelMessageType::TCP_DATA,
+                                                     tcp_data_buffer,
+                                                     bytes);
+                    
+                    if (!success)
+                    {
+                        LOG_ERROR << "Failed to send TCP_DATA for conn_id=" << conn_id << std::endl;
+                        tcp_connections.removeConnection(conn_id);
+                    }
+                }
+            }
         }
     }
+    
+    // Clean up all TCP connections on exit
+    LOG_INFO << "Closing " << tcp_connections.connectionCount() << " TCP connections" << std::endl;
 }
 

@@ -48,6 +48,7 @@ add_library( tunnelNet
 	generic_argp.cc generic_argp.h
 	tunnel_protocol.cc tunnel_protocol.h
 	tunnel_message_reconstructor.cc tunnel_message_reconstructor.h
+	tcp_connection_manager.cc tcp_connection_manager.h
 	udp_packet.cc udp_packet.h
 	)
 
