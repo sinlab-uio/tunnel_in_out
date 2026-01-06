@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netinet/tcp.h>  // For TCP_NODELAY
 
 #include <fcntl.h>
 #include <unistd.h> // for close
@@ -27,6 +28,8 @@ TCPSocket::TCPSocket( const TCPSocket& listener )
         return;
     }
 
+    // CRITICAL FOR LOW LATENCY: Disable Nagle's algorithm on accepted connections
+    setTcpNoDelay();
 
     // Reusing the address struct peer. We are actually retrieving our own port.
     peerlen = peer.size();
@@ -58,6 +61,27 @@ TCPSocket::~TCPSocket( )
     destroy();
 }
 
+void TCPSocket::setTcpNoDelay()
+{
+    // Disable Nagle's algorithm for low latency
+    // This sends packets immediately instead of buffering them
+    int flag = 1;
+    if (setsockopt(_sock, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(int)) < 0) {
+        std::cerr << "Warning: Failed to set TCP_NODELAY - latency may be higher" << std::endl;
+    }
+}
+
+void TCPSocket::setSocketBuffers(int size)
+{
+    // Increase socket buffers for better burst handling
+    if (setsockopt(_sock, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size)) < 0) {
+        std::cerr << "Warning: Failed to set SO_SNDBUF" << std::endl;
+    }
+    if (setsockopt(_sock, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size)) < 0) {
+        std::cerr << "Warning: Failed to set SO_RCVBUF" << std::endl;
+    }
+}
+
 bool TCPSocket::createClient( const char* host, uint16_t port )
 {
     int retval;
@@ -68,6 +92,12 @@ bool TCPSocket::createClient( const char* host, uint16_t port )
         std::cerr << "Failed to create TCP socket" << std::endl;
         return false;
     }
+
+    // CRITICAL FOR LOW LATENCY: Disable Nagle's algorithm
+    setTcpNoDelay();
+    
+    // Increase socket buffers for better burst handling (1MB)
+    setSocketBuffers(1024 * 1024);
 
     SockAddr server( host, port );
 
@@ -166,10 +196,11 @@ void TCPSocket::setNoBlock( )
 
 int TCPSocket::recv( char* buffer, size_t buflen )
 {
-    std::cout << __FILE__ << ":" << __LINE__ 
-              << " wait for data on TCP socket " << _sock 
-              << ", port " << _port 
-              << " (up to " << buflen << " bytes)" << std::endl;
+    // Minimal logging for low latency - comment out in production
+    // std::cout << __FILE__ << ":" << __LINE__ 
+    //           << " wait for data on TCP socket " << _sock 
+    //           << ", port " << _port 
+    //           << " (up to " << buflen << " bytes)" << std::endl;
 
     int bytesReceived = ::read( _sock, buffer, buflen );
     if (bytesReceived < 0)
@@ -180,17 +211,19 @@ int TCPSocket::recv( char* buffer, size_t buflen )
         return bytesReceived;
     }
 
-    std::cout << __FILE__ << ":" << __LINE__ 
-              << " read " << bytesReceived 
-              << " bytes from TCP socket " << _sock << std::endl;
+    // Minimal logging for low latency - comment out in production
+    // std::cout << __FILE__ << ":" << __LINE__ 
+    //           << " read " << bytesReceived 
+    //           << " bytes from TCP socket " << _sock << std::endl;
     return bytesReceived;
 }
 
 int TCPSocket::send( const void* buffer, size_t buflen )
 {
-    std::cout << __FILE__ << ":" << __LINE__ 
-              << " sending " << buflen 
-              << " bytes on TCP socket " << _sock << std::endl;
+    // Minimal logging for low latency - comment out in production
+    // std::cout << __FILE__ << ":" << __LINE__ 
+    //           << " sending " << buflen 
+    //           << " bytes on TCP socket " << _sock << std::endl;
 
     size_t totalSent = 0;
     const char* buf = static_cast<const char*>(buffer);
@@ -234,9 +267,10 @@ int TCPSocket::send( const void* buffer, size_t buflen )
         totalSent += bytesSent;
     }
 
-    std::cout << __FILE__ << ":" << __LINE__ 
-              << " sent " << totalSent 
-              << " bytes on TCP socket " << _sock << std::endl;
+    // Minimal logging for low latency - comment out in production
+    // std::cout << __FILE__ << ":" << __LINE__ 
+    //           << " sent " << totalSent 
+    //           << " bytes on TCP socket " << _sock << std::endl;
     return totalSent;
 }
 

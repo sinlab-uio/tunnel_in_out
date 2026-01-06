@@ -1,30 +1,28 @@
 #pragma once
 
-// #include <iostream>
-// #include <string>
-// #include <vector>
-// #include <cstring> // For memset
-
-#include <sys/types.h>
-// #include <sys/socket.h>
-// #include <netinet/in.h>
-// #include <arpa/inet.h>
-// #include <unistd.h> // for close
-// #include <errno.h>  // for errno
-
-// #include <sys/types.h>
-// #include <net/if.h>
-// #include <ifaddrs.h>
-// #include <sys/types.h>
-// #include <netdb.h>
-
-#include "sockaddr.h"
+#include <iostream>
+#include <string>
+#include <stdint.h>
 
 class TCPSocket
 {
-    bool     _valid {false};
-    uint16_t _port  {0};
-    int      _sock  {-1};
+    int      _sock  { -1 };
+    uint16_t _port  { 0 };
+    bool     _valid { false };
+
+    /* Create a TCP socket and connect it to the given port.
+     * Store own port in _port.
+     */
+    bool createClient( const char* host, uint16_t port );
+
+    /* Create a TCP socket and bind it to the given port.
+     * Store own port in _port.
+     */
+    bool createServer( uint16_t port );
+    
+    // Low-latency optimizations
+    void setTcpNoDelay();
+    void setSocketBuffers(int size);
 
 public:
     // Create an unconnected client socket
@@ -49,32 +47,22 @@ public:
     // Close the socket if it is still valid
     ~TCPSocket( );
 
-    /* Create a TCP socket and bind it to the given port.
-     * Store own port in _port.
-     */
-    bool createServer( uint16_t port );
-
-    /* Create a TCP socket and connect it to the given port.
-     * Store own port in _port.
-     */
-    bool createClient( const char* host, uint16_t port );
-
     // Close the UDP socket and reset the valid flat
     void destroy( );
 
+    // Check if the socket is currently valid
+    inline bool valid() const { return _valid; }
+
     // Integer value of the socket
     int socket() const;
-
-    // Set this socket to non-blocking. Important for TCP forwarding.
-    void setNoBlock( );
-
+   
     /* Returns the _port variable. It is not guaranteed that this is
      * the port number that getsockname would return.
      */
-    int getPort() const { return _port; }
+    inline uint16_t getPort() const { return _port; }
 
-    // Check if the socket is currently valid
-    bool valid() const { return _valid; }
+    // Set this socket to non-blocking. Important for TCP forwarding.
+    void setNoBlock( );
 
     /* Read from the socket into given buffer, up to buflen bytes.
      * The socket must be valid.
