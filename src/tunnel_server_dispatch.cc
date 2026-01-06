@@ -112,7 +112,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                 // Interrupted by signal, retry
                 continue;
             }
-            LOG_ERROR << "Select faliled: " << strerror(errno) << std::endl;
+            LOG_ERROR << "Select failed: " << strerror(errno) << std::endl;
             break;
         }
 
