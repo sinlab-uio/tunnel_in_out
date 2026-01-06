@@ -1,19 +1,8 @@
-// #include <iostream>
-// #include <string>
-// #include <vector>
-// #include <cstring> // For memset
-
-// #include <sys/socket.h>
-// #include <netinet/in.h>
-// #include <arpa/inet.h>
 #include <unistd.h> // for close
 #include <string.h> // for strerror
-// #include <unistd.h>
 #include <fcntl.h>
-// #include <sys/socket.h> // For socket creation and types
 
-// #include <errno.h>  // for errno
-
+#include "verbose.h"
 #include "sockaddr.h"
 #include "udp.h"
 
@@ -32,7 +21,7 @@ bool UDPSocket::createServer( uint16_t port )
     _sock = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if( _sock < 0 )
     {
-        std::cerr << "Failed to create UDP socket" << std::endl;
+        LOG_WARN << "Failed to create UDP socket" << std::endl;
         return false;
     }
 
@@ -45,7 +34,7 @@ bool UDPSocket::createServer( uint16_t port )
 
     if( retval < 0 )
     {
-        std::cerr << "Failed to bind UDP socket to port " << port << std::endl;
+        LOG_WARN << "Failed to bind UDP socket to port " << port << std::endl;
         close( _sock );
         return false;
     }
@@ -61,7 +50,7 @@ bool UDPSocket::create( )
     _sock = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if( _sock < 0 )
     {
-        std::cerr << "Failed to create UDP socket" << std::endl;
+        LOG_WARN << "Failed to create UDP socket" << std::endl;
         return false;
     }
 
@@ -75,7 +64,7 @@ void UDPSocket::destroy( )
 {
     if( _valid )
     {
-        std::cerr << "Closing UDP socket " << _sock << std::endl;
+        LOG_DEBUG << "Closing UDP socket " << _sock << std::endl;
         close( _sock );
         _valid = false;
         _sock  = -1;
@@ -104,16 +93,16 @@ int UDPSocket::recv( char* buffer, size_t buflen, SockAddr& clientAddr )
 {
     socklen_t clientAddrLen = clientAddr.size();
 
-    // std::cout << "Read UDP packet arriving on port " << _port << std::endl;
+    LOG_DEBUG << "Read UDP packet arriving on port " << _port << std::endl;
 
     int bytesReceived = recvfrom( _sock, buffer, buflen, 0, clientAddr.get(), &clientAddrLen );
     if (bytesReceived < 0)
     {
-        std::cerr << __PRETTY_FUNCTION__ << "recvfrom failed" << std::endl;
+        LOG_WARN << "recvfrom failed" << std::endl;
         return bytesReceived;
     }
 
-    // std::cout << "Received " << bytesReceived << " bytes from " << clientAddr.getAddress() << ":" << clientAddr.getPort() << std::endl;
+    LOG_DEBUG << "Received " << bytesReceived << " bytes from " << clientAddr.getAddress() << ":" << clientAddr.getPort() << std::endl;
     return bytesReceived;
 }
 
@@ -127,20 +116,20 @@ int UDPSocket::send( const char* buffer, size_t buflen, const SockAddr& dest )
 {
     if( buffer == nullptr )
     {
-        std::cerr << __PRETTY_FUNCTION__ << " calling with buffer that is NULL" << std::endl;
+        LOG_DEBUG << "calling with buffer that is NULL" << std::endl;
         return -1;
     }
 
-    std::cout << "Sending " << buflen << " bytes from UDP packets port " << _port << std::endl;
+    LOG_DEBUG << "Sending " << buflen << " bytes from UDP packets port " << _port << std::endl;
 
     int bytesSent = sendto( _sock, buffer, buflen, 0, dest.get(), dest.size() );
     if (bytesSent < 0)
     {
-        std::cerr << __PRETTY_FUNCTION__ << " sendto " << buflen << " bytes to " << dest << " failed: " << strerror(errno) << std::endl;
+        LOG_DEBUG << "sendto " << buflen << " bytes to " << dest << " failed: " << strerror(errno) << std::endl;
         return bytesSent;
     }
 
-    std::cout << "Sent " << bytesSent << " bytes to " << dest.getAddress() << ":" << dest.getPort() << std::endl;
+    LOG_DEBUG << "Sent " << bytesSent << " bytes to " << dest.getAddress() << ":" << dest.getPort() << std::endl;
     return bytesSent;
 }
 

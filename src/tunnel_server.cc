@@ -13,6 +13,7 @@
 #include "sockaddr.h"
 #include "udp.h"
 #include "tcp.h"
+#include "verbose.h"
 
 int main( int argc, char* argv[] )
 {
@@ -29,7 +30,7 @@ int main( int argc, char* argv[] )
     TCPSocket tunnel_listener( args.tunnel_tcp );
     if( tunnel_listener.valid() == false )
     {
-        std::cerr << "Failed to bind the tunnel listening socket to port " << args.tunnel_tcp << " (quitting)" << std::endl;
+        LOG_ERROR << "Failed to bind the tunnel listening socket to port " << args.tunnel_tcp << " (quitting)" << std::endl;
         return -1;
     }
     std::cout << "= Waiting for TCP connection from TunnelClient on port " << tunnel_listener.getPort() << ", socket " << tunnel_listener.socket() << std::endl;
@@ -37,7 +38,7 @@ int main( int argc, char* argv[] )
     UDPSocket outside_udp( args.outside_udp );
     if( outside_udp.valid() == false )
     {
-        std::cerr << "Failed to bind the outside UDP socket to port " << args.outside_udp << " (quitting)" << std::endl;
+        LOG_ERROR << "Failed to bind the outside UDP socket to port " << args.outside_udp << " (quitting)" << std::endl;
         return -1;
     }
     std::cout << "= Waiting for UDP packets from the outside on port " << outside_udp.getPort()
@@ -46,7 +47,7 @@ int main( int argc, char* argv[] )
     TCPSocket outside_tcp_listener( args.outside_tcp );
     if( outside_tcp_listener.valid() == false )
     {
-        std::cerr << "Failed to bind the outside TCP listening socket to port " << args.outside_tcp << " (quitting)" << std::endl;
+        LOG_ERROR << "Failed to bind the outside TCP listening socket to port " << args.outside_tcp << " (quitting)" << std::endl;
         return -1;
     }
     std::cout << "= Listening for TCP connection from the outside on port "

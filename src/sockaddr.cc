@@ -1,19 +1,11 @@
 #include "sockaddr.h"
 
-// #include <iostream>
-// #include <string>
-// #include <vector>
-// #include <cstring> // For memset
 #include <string.h>
-
 #include <sys/types.h>
-// #include <sys/socket.h>
-// #include <netinet/in.h>
 #include <arpa/inet.h>
-// #include <unistd.h> // for close
-// #include <errno.h>  // for errno
-
 #include <netdb.h>
+
+#include "verbose.h"
 
 SockAddr::SockAddr( )
 {
@@ -40,7 +32,7 @@ SockAddr::SockAddr( const char* remoteName, uint16_t port )
     int status = getaddrinfo( remoteName, nullptr, &hints, &result );
     if (status != 0)
     {
-        std::cerr << "Could not get IPv4 address for " << remoteName << ": " << gai_strerror(status) << std::endl;
+        LOG_WARN << "Could not get IPv4 address for " << remoteName << ": " << gai_strerror(status) << std::endl;
         return;
     }
 

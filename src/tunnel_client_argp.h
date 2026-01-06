@@ -11,6 +11,8 @@ struct arguments
 
     std::string tunnel_host      {""};
     uint16_t    tunnel_port      {0};
+    
+    bool verbose {false};
 };
 
 void callArgParse( int argc, char* argv[], arguments& args );

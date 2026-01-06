@@ -41,6 +41,7 @@ endif()
 include_directories(${ARGP_INCLUDE_PATH})
 
 add_library( tunnelNet
+	verbose.cc verbose.h
 	sockaddr.cc sockaddr.h
 	udp.cc udp.h
 	tcp.cc tcp.h

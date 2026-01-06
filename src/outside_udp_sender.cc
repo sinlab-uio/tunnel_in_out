@@ -28,7 +28,7 @@ int main( int argc, char* argv[] )
     UDPSocket glove;
     if( glove.create() == false )
     {
-        std::cerr << "Failed to create UDP socket for the outside UDP source (quitting)" << std::endl;
+        std::cout << "Failed to create UDP socket for the outside UDP source (quitting)" << std::endl;
         return -1;
     }
     std::cout << "Successfully created an anonymous UDP socket as an outside." << std::endl;

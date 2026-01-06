@@ -5,10 +5,10 @@
 #include <sys/types.h>
 #include <stdint.h>
 #include "tunnel_server_argp.h"
+#include "verbose.h"
 
 const char *argp_program_version = "TunnelServer 0.1";
 const char *argp_program_bug_address = "griff@uio.no";
-// static char args_doc[] = " <tunnel-port>"; // "[FILENAME]...";
 static char doc[] = "\n"
                     "TunnelServer runs on the outside of a firewall. It waits passively for TunnelClient to connect to it. "
                     "After that, it will provide a user-space splicing of the specified TCP connections and a TCP tunnel for the specified UDP ports.\n";
@@ -17,6 +17,7 @@ static struct argp_option options[] = {
     { "<tunnel-port>",  1, "int", OPTION_DOC, "TCP listening port of this tunnel."},
     { "udp",          'u', "int", 0, "(mandatory) The UDP port to which TunnelServer will listen for packets from the outside."},
     { "tcp",          't', "int", 0, "(mandatory) The TCP port to which TunnelServer will listen for connection from the outside."},
+    { "verbose",      'v', 0,     0, "Enable verbose output (informational and debug messages)."},
     { 0 }
 };
 
@@ -28,12 +29,13 @@ static error_t parse_opt( int key, char *arg, struct argp_state *state )
     {
     case 'u': args->outside_udp = atoi( arg ); break;
     case 't': args->outside_tcp = atoi( arg ); break;
+    case 'v': args->verbose = true; g_verbose = true; break;
     case ARGP_KEY_ARG:
         switch( state->arg_num )
         {
         case 0: args->tunnel_tcp = atoi(arg); break;
         default :
-            std::cerr << "Positional command line argument " << state->arg_num << " value " << arg << std::endl;
+            LOG_DEBUG << "Positional command line argument " << state->arg_num << " value " << arg << std::endl;
         }
         break;
     case ARGP_KEY_END:

@@ -13,6 +13,7 @@
 #include "sockaddr.h"
 #include "udp.h"
 #include "tcp.h"
+#include "verbose.h"
 
 int main( int argc, char* argv[] )
 {
@@ -20,27 +21,27 @@ int main( int argc, char* argv[] )
 
     callArgParse( argc, argv, args );
 
-    std::cerr << "= ======================" << std::endl;
-    std::cerr << "= ==== TunnelClient ====" << std::endl;
-    std::cerr << "= ======================" << std::endl;
+    std::cout << "= ======================" << std::endl;
+    std::cout << "= ==== TunnelClient ====" << std::endl;
+    std::cout << "= ======================" << std::endl;
     std::cout << "= Press Q<ret> to quit" << std::endl;
 
     TCPSocket tunnel( args.tunnel_host, args.tunnel_port );
     if( tunnel.valid() == false )
     {
-        std::cerr << "Failed to connect the tunnel to "
+        LOG_ERROR << "Failed to connect the tunnel to "
                   << args.tunnel_host << ":" << args.tunnel_port
                   << " (quitting)" << std::endl;
         return -1;
     }
 
-    std::cerr << "= Connected to " << args.tunnel_host << ":" << args.tunnel_port
+    std::cout << "= Connected to " << args.tunnel_host << ":" << args.tunnel_port
               << " on socket " << tunnel.socket() << std::endl;
 
     UDPSocket udp_forwarder;
     if( udp_forwarder.create() == false )
     {
-        std::cerr << "Failed to create UDP socket for the forwarder (quitting)" << std::endl;
+        LOG_ERROR << "Failed to create UDP socket for the forwarder (quitting)" << std::endl;
         return -1;
     }
     std::cout << "= Anonymous forwarding socket " << udp_forwarder.socket() << " created" << std::endl;

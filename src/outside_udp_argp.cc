@@ -2,8 +2,10 @@
 #include <string>
 
 #include <argp.h>
+
 #include "generic_argp.h"
 #include "outside_udp_argp.h"
+#include "verbose.h"
 
 const char *argp_program_version = "outside_udp 0.1";
 const char *argp_program_bug_address = "griff@uio.no";
@@ -15,8 +17,6 @@ static struct argp_option options[] = {
     { "send-too-long", 'x', 0, 0, "Optional, attempt to send 10000-byte packet."},
     { 0 }
 };
-
-// #define CERR std::cerr << __FILE__ << ":" << __LINE__ << " "
 
 static error_t parse_opt( int key, char *arg, struct argp_state *state )
 {
@@ -43,7 +43,7 @@ static error_t parse_opt( int key, char *arg, struct argp_state *state )
             }
             break;
         default :
-            std::cerr << "Positional command line argument " << state->arg_num << " value " << arg << std::endl;
+            LOG_DEBUG << "Positional command line argument " << state->arg_num << " value " << arg << std::endl;
         }
         break;
     case ARGP_KEY_END:

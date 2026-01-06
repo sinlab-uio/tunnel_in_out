@@ -5,17 +5,19 @@
 #include <argp.h>
 #include "generic_argp.h"
 #include "tunnel_client_argp.h"
+#include "verbose.h"
 
 const char *argp_program_version = "TunnelClient 0.1";
 const char *argp_program_bug_address = "griff@uio.no";
 static char doc[] = "\n"
                     "TunnelClient runs on the inside of a firewall. It connects actively to TunnelServer. "
                     "After that, it provides user-space splicing of a specified TCP connection and turns data arriving the tunnel back into UDP packets.\n"
-                    "  <tunnel-rl>\tThe URL, hostname:port or 'dotted decimal address':port of the TunnelServer machine.\n";
+                    "  <tunnel-url>\tThe URL, hostname:port or 'dotted decimal address':port of the TunnelServer machine.\n";
 static char args_doc[] = "<tunnel-url>";
 static struct argp_option options[] = {
     { "fwd-udp",      'u', "string",    0, "(mandatory) The UDP URL of the local machine."},
     { "fwd-tcp",      't', "string",    0, "(mandatory) The TCP URL of the local machine."},
+    { "verbose",      'v', 0,           0, "Enable verbose output (informational and debug messages)."},
     { 0 }
 };
 
@@ -31,7 +33,7 @@ static error_t parse_opt( int key, char *arg, struct argp_state *state )
             const int port = extractPort( args->forward_udp_host );
             if( port < 0 )
             {
-                std::cerr << "UDP URL does not contain a port" << std::endl;
+                LOG_ERROR << "UDP URL does not contain a port" << std::endl;
                 return 0;
             }
             args->forward_udp_port = port;
@@ -43,11 +45,15 @@ static error_t parse_opt( int key, char *arg, struct argp_state *state )
             const int port = extractPort( args->forward_tcp_host );
             if( port < 0 )
             {
-                std::cerr << "TCP URL does not contain a port" << std::endl;
+                LOG_ERROR << "TCP URL does not contain a port" << std::endl;
                 return 0;
             }
             args->forward_tcp_port = port;
         }
+        break;
+    case 'v':
+        args->verbose = true;
+        g_verbose = true;
         break;
     case ARGP_KEY_ARG:
         switch( state->arg_num )
@@ -58,14 +64,14 @@ static error_t parse_opt( int key, char *arg, struct argp_state *state )
                 const int port = extractPort( args->tunnel_host );
                 if( port < 0 )
                 {
-                    std::cerr << "URL of the positional command line argument does not contain a port" << std::endl;
+                    LOG_ERROR << "URL of the positional command line argument does not contain a port" << std::endl;
                     return 0;
                 }
                 args->tunnel_port = port;
             }
             break;
         default :
-            std::cerr << "Positional command line argument " << state->arg_num << " value " << arg << std::endl;
+            LOG_DEBUG << "Positional command line argument " << state->arg_num << " value " << arg << std::endl;
         }
         break;
     case ARGP_KEY_END:

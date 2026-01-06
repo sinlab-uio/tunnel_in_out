@@ -9,6 +9,7 @@
 
 #include "sockaddr.h"
 #include "tcp.h"
+#include "verbose.h"
 
 TCPSocket::TCPSocket( uint16_t port )
 {
@@ -24,7 +25,7 @@ TCPSocket::TCPSocket( const TCPSocket& listener )
     _sock = ::accept( listener.socket(), peer.get(), &peerlen );
     if( _sock < 0 )
     {
-        std::cerr << "Failed to create TCP socket from a listener" << std::endl;
+        LOG_WARN << "Failed to create TCP socket from a listener" << std::endl;
         return;
     }
 
@@ -36,14 +37,14 @@ TCPSocket::TCPSocket( const TCPSocket& listener )
     int retval = getsockname( _sock, peer.get(), &peerlen );
     if( retval < 0 )
     {
-        std::cerr << "Failed to retrieve TCP socket's own port after accept (ignore)" << std::endl;
+        LOG_WARN << "Failed to retrieve TCP socket's own port after accept (ignore)" << std::endl;
     }
     else
     {
         _port = peer.getPort();
     }
 
-    std::cerr << "Created TCP server socket " << _sock << " on port " << _port << std::endl;
+    LOG_DEBUG << "Created TCP server socket " << _sock << " on port " << _port << std::endl;
 
     _valid = true;
 }
@@ -67,7 +68,7 @@ void TCPSocket::setTcpNoDelay()
     // This sends packets immediately instead of buffering them
     int flag = 1;
     if (setsockopt(_sock, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(int)) < 0) {
-        std::cerr << "Warning: Failed to set TCP_NODELAY - latency may be higher" << std::endl;
+        LOG_WARN << "Failed to set TCP_NODELAY - latency may be higher" << std::endl;
     }
 }
 
@@ -75,10 +76,10 @@ void TCPSocket::setSocketBuffers(int size)
 {
     // Increase socket buffers for better burst handling
     if (setsockopt(_sock, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size)) < 0) {
-        std::cerr << "Warning: Failed to set SO_SNDBUF" << std::endl;
+        LOG_WARN << "Failed to set SO_SNDBUF" << std::endl;
     }
     if (setsockopt(_sock, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size)) < 0) {
-        std::cerr << "Warning: Failed to set SO_RCVBUF" << std::endl;
+        LOG_WARN << "Failed to set SO_RCVBUF" << std::endl;
     }
 }
 
@@ -89,7 +90,7 @@ bool TCPSocket::createClient( const char* host, uint16_t port )
     _sock = ::socket( AF_INET, SOCK_STREAM, IPPROTO_TCP );
     if( _sock < 0 )
     {
-        std::cerr << "Failed to create TCP socket" << std::endl;
+        LOG_ERROR << "Failed to create TCP socket" << std::endl;
         return false;
     }
 
@@ -104,7 +105,7 @@ bool TCPSocket::createClient( const char* host, uint16_t port )
     retval = connect( _sock, server.get(), server.size() );
     if( retval < 0 )
     {
-        std::cerr << "Failed to connect TCP client socket to port " << port
+        LOG_ERROR << "Failed to connect TCP client socket to port " << port
                   << " - " << strerror(errno)
                   << std::endl;
         ::close( _sock );
@@ -117,7 +118,7 @@ bool TCPSocket::createClient( const char* host, uint16_t port )
     retval = getsockname( _sock, addr.get(), &addrlen );
     if( retval < 0 )
     {
-        std::cerr << "Failed to retrieve tunnel TCP socket's local port after connect (ignore)" << std::endl;
+        LOG_WARN << "Failed to retrieve tunnel TCP socket's local port after connect (ignore)" << std::endl;
     }
     else
     {
@@ -133,7 +134,7 @@ bool TCPSocket::createServer( uint16_t port )
     _sock = ::socket( AF_INET, SOCK_STREAM, IPPROTO_TCP );
     if( _sock < 0 )
     {
-        std::cerr << "Failed to create TCP socket" << std::endl;
+        LOG_ERROR << "Failed to create TCP socket" << std::endl;
         return false;
     }
 
@@ -141,21 +142,21 @@ bool TCPSocket::createServer( uint16_t port )
     int optval = 1;
     if( ::setsockopt( _sock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval) ) < 0 )
     {
-        std::cerr << "Warning: Failed to set SO_REUSEADDR on TCP socket" << std::endl;
+        LOG_WARN << "Failed to set SO_REUSEADDR on TCP socket" << std::endl;
     }
 
     SockAddr server( port );
 
     if( ::bind( _sock, server.get(), server.size() ) < 0 )
     {
-        std::cerr << "Failed to bind TCP server socket " << _sock << " to port " << port << std::endl;
+        LOG_ERROR << "Failed to bind TCP server socket " << _sock << " to port " << port << std::endl;
         ::close( _sock );
         return false;
     }
 
     if( ::listen( _sock, SOMAXCONN ) < 0 )
     {
-        std::cerr << "Failed to set backlog queue for TCP server socket " << _sock << std::endl;
+        LOG_ERROR << "Failed to set backlog queue for TCP server socket " << _sock << std::endl;
         ::close( _sock );
         return false;
     }
@@ -169,7 +170,7 @@ void TCPSocket::destroy( )
 {
     if( _valid )
     {
-        std::cerr << "Closing TCP socket " << _sock << std::endl;
+        LOG_DEBUG << "Closing TCP socket " << _sock << std::endl;
         ::close( _sock );
         _valid = false;
         _sock  = -1;
@@ -196,34 +197,27 @@ void TCPSocket::setNoBlock( )
 
 int TCPSocket::recv( char* buffer, size_t buflen )
 {
-    // Minimal logging for low latency - comment out in production
-    // std::cout << __FILE__ << ":" << __LINE__ 
-    //           << " wait for data on TCP socket " << _sock 
-    //           << ", port " << _port 
-    //           << " (up to " << buflen << " bytes)" << std::endl;
+    LOG_DEBUG << "wait for data on TCP socket " << _sock 
+              << ", port " << _port 
+              << " (up to " << buflen << " bytes)" << std::endl;
 
     int bytesReceived = ::read( _sock, buffer, buflen );
     if (bytesReceived < 0)
     {
-        std::cerr << __FILE__ << ":" << __LINE__ 
-                  << " failed to read from TCP socket " << _sock 
-                  << " with error msg " << strerror(errno) << std::endl;
+        LOG_WARN << "failed to read from TCP socket " << _sock 
+                 << " with error msg " << strerror(errno) << std::endl;
         return bytesReceived;
     }
 
-    // Minimal logging for low latency - comment out in production
-    // std::cout << __FILE__ << ":" << __LINE__ 
-    //           << " read " << bytesReceived 
-    //           << " bytes from TCP socket " << _sock << std::endl;
+    LOG_DEBUG << "read " << bytesReceived 
+              << " bytes from TCP socket " << _sock << std::endl;
     return bytesReceived;
 }
 
 int TCPSocket::send( const void* buffer, size_t buflen )
 {
-    // Minimal logging for low latency - comment out in production
-    // std::cout << __FILE__ << ":" << __LINE__ 
-    //           << " sending " << buflen 
-    //           << " bytes on TCP socket " << _sock << std::endl;
+    LOG_DEBUG << "sending " << buflen 
+              << " bytes on TCP socket " << _sock << std::endl;
 
     size_t totalSent = 0;
     const char* buf = static_cast<const char*>(buffer);
@@ -242,15 +236,12 @@ int TCPSocket::send( const void* buffer, size_t buflen )
             else if (errno == EWOULDBLOCK || errno == EAGAIN)
             {
                 // Socket buffer full, but we're in blocking mode so this shouldn't happen
-                std::cerr << __FILE__ << ":" << __LINE__ 
-                          << " unexpected EWOULDBLOCK on blocking socket" << std::endl;
+                LOG_WARN << " unexpected EWOULDBLOCK on blocking socket" << std::endl;
                 return -1;
             }
             else
             {
-                // Real error
-                std::cerr << __FILE__ << ":" << __LINE__ 
-                          << " failed to send " << buflen 
+                LOG_ERROR << " failed to send " << buflen 
                           << " bytes on TCP socket " << _sock 
                           << " with error msg " << strerror(errno) << std::endl;
                 return -1;
@@ -259,18 +250,15 @@ int TCPSocket::send( const void* buffer, size_t buflen )
         else if (bytesSent == 0)
         {
             // Connection closed
-            std::cerr << __FILE__ << ":" << __LINE__ 
-                      << " connection closed during send" << std::endl;
+            LOG_WARN << "Connection closed during send" << std::endl;
             return -1;
         }
         
         totalSent += bytesSent;
     }
 
-    // Minimal logging for low latency - comment out in production
-    // std::cout << __FILE__ << ":" << __LINE__ 
-    //           << " sent " << totalSent 
-    //           << " bytes on TCP socket " << _sock << std::endl;
+    LOG_DEBUG << "sent " << totalSent 
+              << " bytes on TCP socket " << _sock << std::endl;
     return totalSent;
 }
 
