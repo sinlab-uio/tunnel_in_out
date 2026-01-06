@@ -7,12 +7,13 @@
 #include <sys/select.h>
 #include <unistd.h> // for close
 #include <string.h> // for strerror
+#include <errno.h>
 
 #include "tunnel_client_dispatch.h"
-#include "sockaddr.h"
-#include "udp_packet.h"
+#include "tunnel_protocol.h"
 #include "tunnel_message_reconstructor.h"
-// #include "tcp.h"
+#include "sockaddr.h"
+#include "udp.h"
 
 static const size_t max_buffer_size = 100000;
 
@@ -22,7 +23,7 @@ char tcp_tunnel_buffer[max_buffer_size];
 
 static const bool verbose = false;
 
-UDPReconstructor reconstructor;
+TunnelMessageReconstructor reconstructor;
 
 void dispatch_loop( TCPSocket& tunnel,
                     UDPSocket& udp_forwarder,
@@ -40,12 +41,14 @@ void dispatch_loop( TCPSocket& tunnel,
     read_sockets.push_back( 0 ); // stdin
     read_sockets.push_back( tunnel.socket() );
     read_sockets.push_back( udp_forwarder.socket() );
+    
+    // Set reconstructor verbosity
+    reconstructor.setVerbose(verbose);
 
     while( cont_loop )
     {
         std::vector<int> write_sockets;
-        if( reconstructor.isWriteBlocked() )
-            write_sockets.push_back( udp_forwarder.socket() );
+        // Note: Write blocking is now handled per-message, not globally
 
         FD_ZERO( &read_fds );
         FD_ZERO( &write_fds );
@@ -70,7 +73,7 @@ void dispatch_loop( TCPSocket& tunnel,
 
         if( FD_ISSET( 0, &read_fds ) )
         {
-std::cerr << __LINE__ << std::endl;
+            std::cerr << __LINE__ << std::endl;
             int c = getchar( );
             if( c == 'q' || c == 'Q' )
             {
@@ -81,7 +84,7 @@ std::cerr << __LINE__ << std::endl;
 
         if( FD_ISSET( tunnel.socket(), &read_fds ) )
         {
-std::cerr << __LINE__ << std::endl;
+            std::cerr << __LINE__ << std::endl;
             int retval = tunnel.recv( tcp_tunnel_buffer, max_buffer_size );
             if( retval < 0 )
             {
@@ -96,28 +99,107 @@ std::cerr << __LINE__ << std::endl;
             }
             else
             {
+                // Feed received bytes to reconstructor
                 reconstructor.collect_from_tunnel( tcp_tunnel_buffer, retval );
-                reconstructor.sendLoop( udp_forwarder, dest_udp );
+                
+                // Process all complete messages
+                while (reconstructor.hasMessages())
+                {
+                    TunnelMessage& msg = reconstructor.frontMessage();
+                    
+                    std::cerr << "Processing message: type=" 
+                              << TunnelProtocol::messageTypeToString(msg.type)
+                              << " conn_id=" << msg.conn_id
+                              << " payload_size=" << msg.payload.size() << std::endl;
+                    
+                    switch (msg.type)
+                    {
+                        case TunnelMessageType::UDP_PACKET:
+                        {
+                            // Forward UDP packet to destination
+                            if (msg.payload.size() > 0)
+                            {
+                                int sent = udp_forwarder.send(msg.payload.data(), 
+                                                             msg.payload.size(), 
+                                                             dest_udp);
+                                if (sent >= 0)
+                                {
+                                    std::cerr << "Forwarded UDP packet of size " 
+                                              << msg.payload.size() << std::endl;
+                                }
+                                else if (errno == EWOULDBLOCK || errno == EAGAIN)
+                                {
+                                    std::cerr << "UDP socket would block - packet dropped" << std::endl;
+                                    // In future: could queue for retry
+                                }
+                                else
+                                {
+                                    std::cerr << "Error forwarding UDP packet: " 
+                                              << strerror(errno) << std::endl;
+                                }
+                            }
+                            break;
+                        }
+                        
+                        case TunnelMessageType::TCP_OPEN:
+                        {
+                            std::cerr << "TODO: Handle TCP_OPEN for conn_id " 
+                                      << msg.conn_id << std::endl;
+                            // Future: Create outgoing TCP connection to dest_tcp
+                            break;
+                        }
+                        
+                        case TunnelMessageType::TCP_DATA:
+                        {
+                            std::cerr << "TODO: Handle TCP_DATA for conn_id " 
+                                      << msg.conn_id << std::endl;
+                            // Future: Forward data to corresponding TCP connection
+                            break;
+                        }
+                        
+                        case TunnelMessageType::TCP_CLOSE:
+                        {
+                            std::cerr << "TODO: Handle TCP_CLOSE for conn_id " 
+                                      << msg.conn_id << std::endl;
+                            // Future: Close corresponding TCP connection
+                            break;
+                        }
+                        
+                        default:
+                            std::cerr << "Unknown message type: " 
+                                      << static_cast<int>(msg.type) << std::endl;
+                            break;
+                    }
+                    
+                    // Remove processed message
+                    reconstructor.popMessage();
+                }
             }
         }
 
         if( FD_ISSET( udp_forwarder.socket(), &read_fds ) )
         {
-std::cerr << __LINE__ << std::endl;
-            udp_forwarder.recv( udp_packet_buffer, max_buffer_size );
+            std::cerr << __LINE__ << std::endl;
+            // This receives responses from the destination
+            // Currently not forwarded back through tunnel
+            int retval = udp_forwarder.recv( udp_packet_buffer, max_buffer_size );
+            if (retval > 0)
+            {
+                std::cerr << "Received " << retval 
+                          << " bytes response on UDP forwarder (not forwarded back)" << std::endl;
+            }
         }
 
         if( webSock && FD_ISSET( webSock->socket(), &read_fds ) )
         {
-std::cerr << __LINE__ << std::endl;
+            std::cerr << __LINE__ << std::endl;
             webSock->recv( tcp_websock_buffer, max_buffer_size );
         }
 
         if( FD_ISSET( udp_forwarder.socket(), &write_fds ) )
         {
-std::cerr << __LINE__ << std::endl;
-            reconstructor.unblockWrite( );
-            reconstructor.sendLoop( udp_forwarder, dest_udp );
+            std::cerr << __LINE__ << std::endl;
+            // Write unblocking handled per-message now
         }
     }
 }

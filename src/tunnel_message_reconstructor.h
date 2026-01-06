@@ -2,47 +2,65 @@
 
 #include <vector>
 #include <deque>
+#include "tunnel_protocol.h"
 
-#include "udp_packet.h"
-#include "udp.h"
-
-class UDPReconstructor
+// Represents a complete message received through the tunnel
+struct TunnelMessage
 {
-    /* Bytes from the tunnel are stored in this vector */
-    std::vector<char>      _bytes_from_tunnel;
+    uint32_t conn_id;
+    TunnelMessageType type;
+    std::vector<char> payload;
+    
+    TunnelMessage(uint32_t id, TunnelMessageType t, size_t payload_size)
+        : conn_id(id), type(t), payload(payload_size) {}
+};
 
-    /* The other side of the tunnel sends a 4-byte length value before sending data.
-     * _wait_for_length is true while we are waiting for a length field.
+// Reconstructs tunnel messages from the TCP byte stream
+class TunnelMessageReconstructor
+{
+private:
+    // Bytes received from the tunnel that haven't been processed yet
+    std::vector<char> _bytes_from_tunnel;
+    
+    // State machine for reconstruction
+
+    /* The other side of the tunnel sends a 8-byte headers before sending data.
+     * _wait_for_header is true while we are waiting for a length field.
      */
-    bool                   _wait_for_length { true };
+    bool _wait_for_header { true };
+
+    uint32_t _current_conn_id { 0 };
+
+    TunnelMessageType _current_type { TunnelMessageType::UDP_PACKET };
 
     /* If we are not waiting for a length field, _wait_for_data contains the number
-     * of bytes we are waiting for before we can create a UDP packet for forwarding.
+     * of bytes that are still needed for the current payload.
      */
-    size_t                 _wait_for_data { 0 };
+    size_t _wait_for_payload { 0 };
 
-    /* Changed from vector to deque for O(1) pop_front operations */
-    std::deque<UDPPacket>  reconstructed_packets;
+
+    // Queue of reconstructed messages ready to be processed
+    std::deque<TunnelMessage> _reconstructed_messages;
     
-    bool                   write_blocked { false };
-    bool                   verbose { true };
+    bool _verbose { true };
     
 public:
-    void setNoBlock( UDPSocket& write_socket );
-
-    void collect_from_tunnel( const char* buffer, int buflen );
-
-    void sendLoop( UDPSocket& udp_forwarder, const SockAddr& dest );
-
-    inline bool isWriteBlocked() const { return write_blocked; }
-    inline void unblockWrite() { write_blocked = false; }
-
-    inline bool empty() const { return reconstructed_packets.empty(); }
-
-    inline const UDPPacket& front() const { return reconstructed_packets.front(); }
-
-    inline void setVerbose( bool onoff ) { verbose = onoff; }
+    // Add bytes received from the tunnel to the reconstruction buffer
+    void collect_from_tunnel(const char* buffer, int buflen);
     
-    inline size_t queueSize() const { return reconstructed_packets.size(); }
+    // Check if there are any complete messages ready
+    inline bool hasMessages() const { return !_reconstructed_messages.empty(); }
+    
+    // Get the next complete message (check hasMessages() first!)
+    inline TunnelMessage& frontMessage() { return _reconstructed_messages.front(); }
+    
+    // Remove the front message after processing
+    inline void popMessage() { _reconstructed_messages.pop_front(); }
+    
+    // Get number of queued messages
+    inline size_t messageCount() const { return _reconstructed_messages.size(); }
+    
+    // Control verbosity
+    inline void setVerbose(bool onoff) { _verbose = onoff; }
 };
 

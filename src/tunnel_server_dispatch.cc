@@ -10,6 +10,7 @@
 #include <errno.h>
 
 #include "tunnel_server_dispatch.h"
+#include "tunnel_protocol.h"
 #include "sockaddr.h"
 
 #define CERR std::cerr << __FILE__ << ":" << __LINE__
@@ -17,10 +18,51 @@
 static const size_t max_buffer_size = 100000;
 static const size_t max_udp_packet_size = 65536; // Standard max UDP packet size
 
-// Use smaller, stack-based buffers or heap allocation per connection
+// Buffers
 static char udp_packet_buffer[max_udp_packet_size];
 static char tcp_websock_buffer[max_buffer_size];
 static char tcp_tunnel_buffer[max_buffer_size];
+
+// Helper function to send a tunnel message
+// Returns true on success, false on failure
+bool sendTunnelMessage(TCPSocket& tunnel, 
+                       uint32_t conn_id,
+                       TunnelMessageType type,
+                       const char* payload,
+                       uint16_t payload_len)
+{
+    // Validate payload length
+    if (payload_len > TunnelProtocol::MAX_PAYLOAD_SIZE)
+    {
+        std::cerr << "ERROR: Payload too large: " << payload_len << std::endl;
+        return false;
+    }
+    
+    // Create header
+    TunnelMessageHeader header;
+    TunnelProtocol::createHeader(header, conn_id, payload_len, type);
+    
+    // Send header
+    int sent = tunnel.send(&header, TunnelProtocol::HEADER_SIZE);
+    if (sent != TunnelProtocol::HEADER_SIZE)
+    {
+        CERR << " Failed to send message header" << std::endl;
+        return false;
+    }
+    
+    // Send payload (if any)
+    if (payload_len > 0)
+    {
+        sent = tunnel.send(payload, payload_len);
+        if (sent != payload_len)
+        {
+            CERR << " Failed to send message payload" << std::endl;
+            return false;
+        }
+    }
+    
+    return true;
+}
 
 void dispatch_loop( TCPSocket& tunnel_listener,
                     UDPSocket& outside_udp,
@@ -79,8 +121,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
 
         if( FD_ISSET( tunnel_listener.socket(), &fds ) )
         {
-            /* Create a new TCP socket from the connect request. Run connect
-             * in the constructor to consume the data. */
+            /* Create a new TCP socket from the connect request. */
             std::shared_ptr<TCPSocket> tcp_conn( new TCPSocket( tunnel_listener ) );
             if( tcp_conn->valid() )
             {
@@ -109,15 +150,15 @@ void dispatch_loop( TCPSocket& tunnel_listener,
 
         if( FD_ISSET( outside_tcp_listener.socket(), &fds ) )
         {
-            /* Create a new TCP socket from the connect request. Run connect
-             * in the constructor to consume the data. */
+            /* Accept new TCP connection from outside */
             std::shared_ptr<TCPSocket> tcp_conn( new TCPSocket( outside_tcp_listener ) );
             if( tcp_conn->valid() )
             {
-                // Close old webSock if exists
+                // For now, we only support one outside TCP connection
+                // In future: multiple connections with conn_id management
                 if (webSock && webSock->valid())
                 {
-                    std::cout << "= Replacing existing web socket connection" << std::endl;
+                    std::cout << "= Replacing existing outside TCP connection" << std::endl;
                     // Remove old socket from list
                     auto it = std::find(sockets.begin(), sockets.end(), webSock->socket());
                     if (it != sockets.end())
@@ -130,12 +171,14 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                 sockets.push_back( webSock->socket() );
                 std::cout << "= Outside TCP connection established on socket " 
                           << webSock->socket() << std::endl;
+                
+                // TODO: Send TCP_OPEN message through tunnel when TCP support is implemented
             }
         }
 
         if( FD_ISSET( outside_udp.socket(), &fds ) )
         {
-            // std::cerr << "Activity on UDP socket " << outside_udp.socket() << std::endl;
+            // Receive UDP packet from outside
             retval = outside_udp.recv( udp_packet_buffer, max_udp_packet_size );
             if( retval < 0 )
             {
@@ -143,39 +186,26 @@ void dispatch_loop( TCPSocket& tunnel_listener,
             }
             else if( retval == 0 )
             {
-                CERR << " recv on outside UDP socket " << outside_udp.socket() 
-                     << " returned " << retval << std::endl;
+                CERR << " recv on outside UDP socket returned 0" << std::endl;
             }
             else
             {
-                CERR << " Received a packet (" << retval << " bytes) on outside UDP port "
-                     << outside_udp.getPort() << ", socket " << outside_udp.socket() << std::endl;
+                CERR << " Received UDP packet (" << retval << " bytes)" << std::endl;
+                
                 if( tunnel && tunnel->valid() )
                 {
-                    // Send length header in network byte order
-                    uint32_t pkt_len = htonl( retval );
-                    CERR << " Sending packet len " << retval << " on TCP" << std::endl;
+                    // Send UDP packet through tunnel using new protocol
+                    // conn_id = 0 for UDP (not using connection multiplexing yet)
+                    bool success = sendTunnelMessage(*tunnel, 
+                                                     0,  // conn_id = 0 for UDP
+                                                     TunnelMessageType::UDP_PACKET,
+                                                     udp_packet_buffer,
+                                                     retval);
                     
-                    int sent = tunnel->send( &pkt_len, sizeof(uint32_t) );
-                    if (sent != sizeof(uint32_t))
+                    if (!success)
                     {
-                        CERR << " Failed to send length header on tunnel. Connection broken?" << std::endl;
-                        // Remove tunnel from socket list and mark as invalid
-                        auto it = std::find(sockets.begin(), sockets.end(), tunnel->socket());
-                        if (it != sockets.end())
-                        {
-                            sockets.erase(it);
-                        }
-                        tunnel.reset();
-                        continue;
-                    }
-                    
-                    CERR << " Sending " << retval << " bytes on TCP" << std::endl;
-                    sent = tunnel->send( udp_packet_buffer, retval );
-                    if (sent != retval)
-                    {
-                        CERR << " Failed to send UDP data on tunnel. Connection broken?" << std::endl;
-                        // Remove tunnel from socket list and mark as invalid
+                        CERR << " Failed to send UDP packet through tunnel. Connection broken?" << std::endl;
+                        // Remove tunnel from socket list
                         auto it = std::find(sockets.begin(), sockets.end(), tunnel->socket());
                         if (it != sockets.end())
                         {
@@ -196,7 +226,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
             int retval = tunnel->recv( tcp_tunnel_buffer, max_buffer_size );
             if( retval == 0 )
             {
-                CERR << " Reading from TCP tunnel returned 0. Connection closed by peer." << std::endl;
+                CERR << " TCP tunnel closed by peer." << std::endl;
                 // Remove from socket list
                 auto it = std::find(sockets.begin(), sockets.end(), tunnel->socket());
                 if (it != sockets.end())
@@ -219,8 +249,11 @@ void dispatch_loop( TCPSocket& tunnel_listener,
             }
             else
             {
-                // Data received on tunnel from TunnelClient - could be responses
-                CERR << " Received " << retval << " bytes on tunnel (currently ignored)" << std::endl;
+                // Data received on tunnel from TunnelClient
+                // In future implementation, this will be parsed and handled
+                // For now, just log it
+                CERR << " Received " << retval << " bytes on tunnel" << std::endl;
+                CERR << " (Message parsing not yet implemented - this would be responses from client)" << std::endl;
             }
         }
 
@@ -229,7 +262,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
             int retval = webSock->recv( tcp_websock_buffer, max_buffer_size );
             if (retval <= 0)
             {
-                CERR << " Web socket closed or error" << std::endl;
+                CERR << " Outside TCP socket closed" << std::endl;
                 // Remove from socket list
                 auto it = std::find(sockets.begin(), sockets.end(), webSock->socket());
                 if (it != sockets.end())
@@ -237,11 +270,15 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                     sockets.erase(it);
                 }
                 webSock.reset();
+                
+                // TODO: Send TCP_CLOSE message through tunnel when TCP support is implemented
             }
             else
             {
-                // TODO: Handle web socket data
-                CERR << " Received " << retval << " bytes on web socket (currently ignored)" << std::endl;
+                // Data received on outside TCP connection
+                CERR << " Received " << retval << " bytes on outside TCP socket" << std::endl;
+                
+                // TODO: Send TCP_DATA message through tunnel when TCP support is implemented
             }
         }
     }

@@ -1,3 +1,3 @@
 #!/bin/bash
-./TunnelClient -f localhost -t 2345 -u 1235 localhost 1234
+./TunnelClient -t localhost:2345 -u localhost:1235 localhost:1234
 

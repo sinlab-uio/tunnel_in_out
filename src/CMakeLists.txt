@@ -45,6 +45,7 @@ add_library( tunnelNet
 	udp.cc udp.h
 	tcp.cc tcp.h
 	generic_argp.cc generic_argp.h
+	tunnel_protocol.cc tunnel_protocol.h
 	)
 
 add_executable( TunnelServer tunnel_server.cc
