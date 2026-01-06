@@ -20,10 +20,11 @@ int main( int argc, char* argv[] )
 
     callArgParse( argc, argv, args );
 
-    std::cout << "= ==== TunnelOut ====" << std::endl;
+    std::cout << "= ===================" << std::endl;
+    std::cout << "= ==== TunnelIn =====" << std::endl;  // FIXED: was "TunnelOut"
+    std::cout << "= ===================" << std::endl;
     std::cout << "= Start this program first" << std::endl;
-    // std::cout << "= Terminates when TunnelIn socket closes." << std::endl;
-    // std::cout << "= Press Q<ret> to quit" << std::endl;
+    std::cout << "= Press Q<ret> to quit" << std::endl;
 
     TCPSocket tunnel_listener( args.tunnel_tcp );
     if( tunnel_listener.valid() == false )
@@ -31,7 +32,7 @@ int main( int argc, char* argv[] )
         std::cerr << "Failed to bind the tunnel listening socket to port " << args.tunnel_tcp << " (quitting)" << std::endl;
         return -1;
     }
-    std::cout << "= Waiting for TCP connection from TunnelIn on port " << tunnel_listener.getPort() << ", socket " << tunnel_listener.socket() << std::endl;
+    std::cout << "= Waiting for TCP connection from TunnelOut on port " << tunnel_listener.getPort() << ", socket " << tunnel_listener.socket() << std::endl;
 
     UDPSocket outside_udp( args.outside_udp );
     if( outside_udp.valid() == false )
@@ -65,5 +66,8 @@ int main( int argc, char* argv[] )
     std::shared_ptr<TCPSocket> webSock;
 
     dispatch_loop( tunnel_listener, outside_udp, outside_tcp_listener, tunnel, webSock );
+    
+    std::cout << "= TunnelIn shutting down" << std::endl;
+    return 0;
 }
 

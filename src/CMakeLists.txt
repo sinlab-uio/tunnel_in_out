@@ -41,28 +41,28 @@ endif()
 include_directories(${ARGP_INCLUDE_PATH})
 
 add_library( tunnelNet
-	src/sockaddr.cc src/sockaddr.h
-	src/udp.cc src/udp.h
-	src/tcp.cc src/tcp.h
-	src/generic_argp.cc src/generic_argp.h
+	sockaddr.cc sockaddr.h
+	udp.cc udp.h
+	tcp.cc tcp.h
+	generic_argp.cc generic_argp.h
 	)
 
-add_executable( TunnelIn src/tunnel_in.cc
-	                 src/tunnel_in_argp.cc src/tunnel_in_argp.h
-	                 src/tunnel_in_dispatch.cc src/tunnel_in_dispatch.h )
+add_executable( TunnelIn tunnel_in.cc
+	                 tunnel_in_argp.cc tunnel_in_argp.h
+	                 tunnel_in_dispatch.cc tunnel_in_dispatch.h )
 target_link_libraries( TunnelIn tunnelNet ${ARGP_LIBRARY} )
 
-add_executable( TunnelOut src/tunnel_out.cc
-	                 src/tunnel_out_argp.cc src/tunnel_out_argp.h
-	                 src/tunnel_out_dispatch.cc src/tunnel_out_dispatch.h
-		 	 src/udp_packet.cc src/udp_packet.h
-		 	 src/udp_reconstructor.cc src/udp_reconstructor.h)
+add_executable( TunnelOut tunnel_out.cc
+	                 tunnel_out_argp.cc tunnel_out_argp.h
+	                 tunnel_out_dispatch.cc tunnel_out_dispatch.h
+		 	 udp_packet.cc udp_packet.h
+		 	 udp_reconstructor.cc udp_reconstructor.h)
 target_link_libraries( TunnelOut tunnelNet ${ARGP_LIBRARY} )
 
-add_executable( OutsideUDP src/outside_udp_sender.cc
-	                 src/outside_udp_argp.cc src/outside_udp_argp.h )
+add_executable( OutsideUDP outside_udp_sender.cc
+	                 outside_udp_argp.cc outside_udp_argp.h )
 target_link_libraries( OutsideUDP tunnelNet ${ARGP_LIBRARY} )
 
-add_executable( test src/test.cc )
+add_executable( test test.cc )
 target_link_libraries( test tunnelNet ${ARGP_LIBRARY} )
 

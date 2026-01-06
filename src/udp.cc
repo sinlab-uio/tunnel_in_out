@@ -32,7 +32,7 @@ bool UDPSocket::createServer( uint16_t port )
     _sock = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if( _sock < 0 )
     {
-        std::cerr << "Faield to create UDP socket" << std::endl;
+        std::cerr << "Failed to create UDP socket" << std::endl;
         return false;
     }
 

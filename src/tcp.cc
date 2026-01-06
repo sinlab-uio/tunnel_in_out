@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <unistd.h> // for close
 #include <string.h> // for strerror
+#include <errno.h>
 
 #include "sockaddr.h"
 #include "tcp.h"
@@ -106,6 +107,13 @@ bool TCPSocket::createServer( uint16_t port )
         return false;
     }
 
+    // Enable SO_REUSEADDR to allow quick restarts
+    int optval = 1;
+    if( ::setsockopt( _sock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval) ) < 0 )
+    {
+        std::cerr << "Warning: Failed to set SO_REUSEADDR on TCP socket" << std::endl;
+    }
+
     SockAddr server( port );
 
     if( ::bind( _sock, server.get(), server.size() ) < 0 )
@@ -158,31 +166,77 @@ void TCPSocket::setNoBlock( )
 
 int TCPSocket::recv( char* buffer, size_t buflen )
 {
-    std::cout << __FILE__ << ":" << __LINE__ << " wait for data on TCP socket " << _sock << ", port " << _port << " (up to " << buflen-1 << " bytes)" << std::endl;
+    std::cout << __FILE__ << ":" << __LINE__ 
+              << " wait for data on TCP socket " << _sock 
+              << ", port " << _port 
+              << " (up to " << buflen << " bytes)" << std::endl;
 
-    int bytesReceived = ::read( _sock, buffer, buflen-1 );
+    int bytesReceived = ::read( _sock, buffer, buflen );
     if (bytesReceived < 0)
     {
-        std::cerr << __FILE__ << ":" << __LINE__ << " failed to read from TCP socket " << _sock << " with error msg " << strerror(errno) << std::endl;
+        std::cerr << __FILE__ << ":" << __LINE__ 
+                  << " failed to read from TCP socket " << _sock 
+                  << " with error msg " << strerror(errno) << std::endl;
         return bytesReceived;
     }
 
-    std::cout << __FILE__ << ":" << __LINE__ << " read " << bytesReceived << " bytes from TCP socket " << _sock << std::endl;
+    std::cout << __FILE__ << ":" << __LINE__ 
+              << " read " << bytesReceived 
+              << " bytes from TCP socket " << _sock << std::endl;
     return bytesReceived;
 }
 
 int TCPSocket::send( const void* buffer, size_t buflen )
 {
-    std::cout << __FILE__ << ":" << __LINE__ << " sending " << buflen << " bytes on TCP socket " << _sock << std::endl;
+    std::cout << __FILE__ << ":" << __LINE__ 
+              << " sending " << buflen 
+              << " bytes on TCP socket " << _sock << std::endl;
 
-    int bytesSent = ::write( _sock, buffer, buflen );
-    if (bytesSent < 0)
+    size_t totalSent = 0;
+    const char* buf = static_cast<const char*>(buffer);
+    
+    while (totalSent < buflen)
     {
-        std::cerr << __FILE__ << ":" << __LINE__ << " failed to send " << buflen << " bytes on TCP socket " << _sock << " with error msg " << strerror(errno) << std::endl;
-        return bytesSent;
+        int bytesSent = ::write( _sock, buf + totalSent, buflen - totalSent );
+        
+        if (bytesSent < 0)
+        {
+            if (errno == EINTR)
+            {
+                // Interrupted by signal, retry
+                continue;
+            }
+            else if (errno == EWOULDBLOCK || errno == EAGAIN)
+            {
+                // Socket buffer full, but we're in blocking mode so this shouldn't happen
+                std::cerr << __FILE__ << ":" << __LINE__ 
+                          << " unexpected EWOULDBLOCK on blocking socket" << std::endl;
+                return -1;
+            }
+            else
+            {
+                // Real error
+                std::cerr << __FILE__ << ":" << __LINE__ 
+                          << " failed to send " << buflen 
+                          << " bytes on TCP socket " << _sock 
+                          << " with error msg " << strerror(errno) << std::endl;
+                return -1;
+            }
+        }
+        else if (bytesSent == 0)
+        {
+            // Connection closed
+            std::cerr << __FILE__ << ":" << __LINE__ 
+                      << " connection closed during send" << std::endl;
+            return -1;
+        }
+        
+        totalSent += bytesSent;
     }
 
-    std::cout << __FILE__ << ":" << __LINE__ << " sent " << bytesSent << " bytes on TCP socket " << _sock << std::endl;
-    return bytesSent;
+    std::cout << __FILE__ << ":" << __LINE__ 
+              << " sent " << totalSent 
+              << " bytes on TCP socket " << _sock << std::endl;
+    return totalSent;
 }
 
