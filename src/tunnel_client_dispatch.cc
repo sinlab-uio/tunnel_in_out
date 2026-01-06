@@ -11,7 +11,7 @@
 #include "tunnel_client_dispatch.h"
 #include "sockaddr.h"
 #include "udp_packet.h"
-#include "udp_reconstructor.h"
+#include "tunnel_message_reconstructor.h"
 // #include "tcp.h"
 
 static const size_t max_buffer_size = 100000;
