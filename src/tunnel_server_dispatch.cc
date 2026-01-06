@@ -229,7 +229,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                 }
                 else
                 {
-                    LOG_INFO << "Tunnel to TunnelClient isn't established. Drop UDP packets." << std::endl;
+                    LOG_WARN << "Tunnel to TunnelClient isn't established. Drop UDP packets." << std::endl;
                 }
             }
         }
