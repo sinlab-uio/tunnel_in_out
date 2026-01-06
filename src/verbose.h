@@ -15,10 +15,8 @@ extern bool g_verbose;
 #define LOG_WARN std::cerr << "[WARN] " << __FILE__ << ":" << __LINE__ << " "
 
 // Only printed when verbose is enabled - for informational messages
-#define LOG_INFO if(g_verbose) std::cerr << "[INFO] " << __FILE__ << ":" << __LINE__ << " "
+#define LOG_INFO if(__builtin_expect(g_verbose, 0)) std::cerr << "[INFO] " << __FILE__ << ":" << __LINE__ << " "
 
 // Only printed when verbose is enabled - for debug messages
-#define LOG_DEBUG if(g_verbose) std::cerr << "[DEBUG] " << __FILE__ << ":" << __LINE__ << " "
+#define LOG_DEBUG if(__builtin_expect(g_verbose, 0)) std::cerr << "[DEBUG] " << __FILE__ << ":" << __LINE__ << " "
 
-// For backward compatibility - maps to LOG_DEBUG
-#define CERR if(g_verbose) std::cerr << __FILE__ << ":" << __LINE__
