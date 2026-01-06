@@ -46,6 +46,8 @@ add_library( tunnelNet
 	tcp.cc tcp.h
 	generic_argp.cc generic_argp.h
 	tunnel_protocol.cc tunnel_protocol.h
+	tunnel_message_reconstructor.cc tunnel_message_reconstructor.h
+	udp_packet.cc udp_packet.h
 	)
 
 add_executable( TunnelServer tunnel_server.cc
@@ -55,9 +57,7 @@ target_link_libraries( TunnelServer tunnelNet ${ARGP_LIBRARY} )
 
 add_executable( TunnelClient tunnel_client.cc
 	                 tunnel_client_argp.cc tunnel_client_argp.h
-	                 tunnel_client_dispatch.cc tunnel_client_dispatch.h
-		 	 udp_packet.cc udp_packet.h
-		 	 tunnel_message_reconstructor.cc tunnel_message_reconstructor.h)
+	                 tunnel_client_dispatch.cc tunnel_client_dispatch.h )
 target_link_libraries( TunnelClient tunnelNet ${ARGP_LIBRARY} )
 
 add_executable( OutsideUDP outside_udp_sender.cc

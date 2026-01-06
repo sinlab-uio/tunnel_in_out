@@ -11,6 +11,7 @@
 
 #include "tunnel_server_dispatch.h"
 #include "tunnel_protocol.h"
+#include "tunnel_message_reconstructor.h"
 #include "sockaddr.h"
 
 #define CERR std::cerr << __FILE__ << ":" << __LINE__
@@ -79,6 +80,14 @@ void dispatch_loop( TCPSocket& tunnel_listener,
     sockets.push_back( tunnel_listener.socket() );
     sockets.push_back( outside_udp.socket() );
     sockets.push_back( outside_tcp_listener.socket() );
+
+    // Track the last sender address for UDP responses
+    SockAddr last_udp_sender;
+    bool has_udp_sender = false;
+    
+    // Message reconstructor for parsing messages from TunnelClient
+    TunnelMessageReconstructor reconstructor;
+    reconstructor.setVerbose(false);  // Set to true for debugging
 
     while( cont_loop )
     {
@@ -178,8 +187,8 @@ void dispatch_loop( TCPSocket& tunnel_listener,
 
         if( FD_ISSET( outside_udp.socket(), &fds ) )
         {
-            // Receive UDP packet from outside
-            retval = outside_udp.recv( udp_packet_buffer, max_udp_packet_size );
+            // Receive UDP packet from outside - could be initial request OR response
+            retval = outside_udp.recv( udp_packet_buffer, max_udp_packet_size, last_udp_sender );
             if( retval < 0 )
             {
                 CERR << " Read from outside UDP socket failed. " << strerror(errno) << std::endl;
@@ -190,7 +199,11 @@ void dispatch_loop( TCPSocket& tunnel_listener,
             }
             else
             {
-                CERR << " Received UDP packet (" << retval << " bytes)" << std::endl;
+                CERR << " Received UDP packet (" << retval << " bytes) from " 
+                     << last_udp_sender.getAddress() << ":" << last_udp_sender.getPort() << std::endl;
+                
+                // Remember this sender for future responses
+                has_udp_sender = true;
                 
                 if( tunnel && tunnel->valid() )
                 {
@@ -250,10 +263,74 @@ void dispatch_loop( TCPSocket& tunnel_listener,
             else
             {
                 // Data received on tunnel from TunnelClient
-                // In future implementation, this will be parsed and handled
-                // For now, just log it
                 CERR << " Received " << retval << " bytes on tunnel" << std::endl;
-                CERR << " (Message parsing not yet implemented - this would be responses from client)" << std::endl;
+                
+                // Feed received bytes to reconstructor
+                reconstructor.collect_from_tunnel( tcp_tunnel_buffer, retval );
+                
+                // Process all complete messages
+                while (reconstructor.hasMessages())
+                {
+                    TunnelMessage& msg = reconstructor.frontMessage();
+                    
+                    std::cerr << "Processing message from TunnelClient: type=" 
+                              << TunnelProtocol::messageTypeToString(msg.type)
+                              << " conn_id=" << msg.conn_id
+                              << " payload_size=" << msg.payload.size() << std::endl;
+                    
+                    switch (msg.type)
+                    {
+                        case TunnelMessageType::UDP_PACKET:
+                        {
+                            // This is a response UDP packet from inside the firewall
+                            // Forward it back to the last sender
+                            if (has_udp_sender)
+                            {
+                                if (msg.payload.size() > 0)
+                                {
+                                    int sent = outside_udp.send(msg.payload.data(), 
+                                                               msg.payload.size(), 
+                                                               last_udp_sender);
+                                    if (sent >= 0)
+                                    {
+                                        std::cerr << "Forwarded UDP response (" << msg.payload.size() 
+                                                  << " bytes) back to " 
+                                                  << last_udp_sender.getAddress() << ":" 
+                                                  << last_udp_sender.getPort() << std::endl;
+                                    }
+                                    else
+                                    {
+                                        std::cerr << "Error forwarding UDP response: " 
+                                                  << strerror(errno) << std::endl;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                std::cerr << "Received UDP response but no sender address known (no request received yet)" 
+                                          << std::endl;
+                            }
+                            break;
+                        }
+                        
+                        case TunnelMessageType::TCP_OPEN:
+                        case TunnelMessageType::TCP_DATA:
+                        case TunnelMessageType::TCP_CLOSE:
+                        {
+                            std::cerr << "TODO: Handle TCP message type " 
+                                      << TunnelProtocol::messageTypeToString(msg.type) << std::endl;
+                            break;
+                        }
+                        
+                        default:
+                            std::cerr << "Unknown message type: " 
+                                      << static_cast<int>(msg.type) << std::endl;
+                            break;
+                    }
+                    
+                    // Remove processed message
+                    reconstructor.popMessage();
+                }
             }
         }
 

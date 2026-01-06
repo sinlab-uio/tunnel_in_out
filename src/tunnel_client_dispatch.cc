@@ -25,6 +25,49 @@ static const bool verbose = false;
 
 TunnelMessageReconstructor reconstructor;
 
+// Helper function to send a tunnel message back to server
+// Returns true on success, false on failure
+bool sendTunnelMessage(TCPSocket& tunnel, 
+                       uint32_t conn_id,
+                       TunnelMessageType type,
+                       const char* payload,
+                       uint16_t payload_len)
+{
+    // Validate payload length
+    if (payload_len > TunnelProtocol::MAX_PAYLOAD_SIZE)
+    {
+        std::cerr << "ERROR: Payload too large: " << payload_len << std::endl;
+        return false;
+    }
+    
+    // Create header
+    TunnelMessageHeader header;
+    TunnelProtocol::createHeader(header, conn_id, payload_len, type);
+    
+    // Send header
+    int sent = tunnel.send(&header, TunnelProtocol::HEADER_SIZE);
+    if (sent != TunnelProtocol::HEADER_SIZE)
+    {
+        std::cerr << __FILE__ << ":" << __LINE__ 
+                  << " Failed to send message header" << std::endl;
+        return false;
+    }
+    
+    // Send payload (if any)
+    if (payload_len > 0)
+    {
+        sent = tunnel.send(payload, payload_len);
+        if (sent != payload_len)
+        {
+            std::cerr << __FILE__ << ":" << __LINE__ 
+                      << " Failed to send message payload" << std::endl;
+            return false;
+        }
+    }
+    
+    return true;
+}
+
 void dispatch_loop( TCPSocket& tunnel,
                     UDPSocket& udp_forwarder,
                     std::shared_ptr<TCPSocket> webSock,
@@ -116,7 +159,7 @@ void dispatch_loop( TCPSocket& tunnel,
                     {
                         case TunnelMessageType::UDP_PACKET:
                         {
-                            // Forward UDP packet to destination
+                            // Forward UDP packet to destination (request from outside)
                             if (msg.payload.size() > 0)
                             {
                                 int sent = udp_forwarder.send(msg.payload.data(), 
@@ -125,7 +168,7 @@ void dispatch_loop( TCPSocket& tunnel,
                                 if (sent >= 0)
                                 {
                                     std::cerr << "Forwarded UDP packet of size " 
-                                              << msg.payload.size() << std::endl;
+                                              << msg.payload.size() << " to destination" << std::endl;
                                 }
                                 else if (errno == EWOULDBLOCK || errno == EAGAIN)
                                 {
@@ -135,6 +178,19 @@ void dispatch_loop( TCPSocket& tunnel,
                                 else
                                 {
                                     std::cerr << "Error forwarding UDP packet: " 
+                                              << strerror(errno) << std::endl;
+                                }
+                            }
+                            else
+                            {
+                                // Zero-length UDP packet is valid
+                                std::cerr << "Forwarding zero-length UDP packet" << std::endl;
+                                int sent = udp_forwarder.send(msg.payload.data(), 
+                                                             0, 
+                                                             dest_udp);
+                                if (sent < 0)
+                                {
+                                    std::cerr << "Error forwarding zero-length UDP packet: " 
                                               << strerror(errno) << std::endl;
                                 }
                             }
@@ -180,13 +236,42 @@ void dispatch_loop( TCPSocket& tunnel,
         if( FD_ISSET( udp_forwarder.socket(), &read_fds ) )
         {
             std::cerr << __LINE__ << std::endl;
-            // This receives responses from the destination
-            // Currently not forwarded back through tunnel
-            int retval = udp_forwarder.recv( udp_packet_buffer, max_buffer_size );
+            
+            // Receive UDP response from the destination
+            SockAddr response_sender;
+            int retval = udp_forwarder.recv( udp_packet_buffer, max_buffer_size, response_sender );
+            
             if (retval > 0)
             {
-                std::cerr << "Received " << retval 
-                          << " bytes response on UDP forwarder (not forwarded back)" << std::endl;
+                std::cerr << "Received UDP response (" << retval 
+                          << " bytes) from destination " 
+                          << response_sender.getAddress() << ":" << response_sender.getPort() 
+                          << std::endl;
+                
+                // Send response back through tunnel to TunnelServer
+                bool success = sendTunnelMessage(tunnel,
+                                                0,  // conn_id = 0 for UDP
+                                                TunnelMessageType::UDP_PACKET,
+                                                udp_packet_buffer,
+                                                retval);
+                
+                if (success)
+                {
+                    std::cerr << "Sent UDP response back through tunnel" << std::endl;
+                }
+                else
+                {
+                    std::cerr << "Failed to send UDP response through tunnel" << std::endl;
+                    // Connection might be broken
+                    cont_loop = false;
+                }
+            }
+            else if (retval < 0)
+            {
+                if (errno != EWOULDBLOCK && errno != EAGAIN)
+                {
+                    std::cerr << "Error receiving UDP response: " << strerror(errno) << std::endl;
+                }
             }
         }
 
