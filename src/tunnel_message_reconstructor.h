@@ -42,8 +42,6 @@ private:
     // Queue of reconstructed messages ready to be processed
     std::deque<TunnelMessage> _reconstructed_messages;
     
-    bool _verbose { true };
-    
 public:
     // Add bytes received from the tunnel to the reconstruction buffer
     void collect_from_tunnel(const char* buffer, int buflen);
@@ -59,8 +57,5 @@ public:
     
     // Get number of queued messages
     inline size_t messageCount() const { return _reconstructed_messages.size(); }
-    
-    // Control verbosity
-    inline void setVerbose(bool onoff) { _verbose = onoff; }
 };
 

@@ -87,7 +87,6 @@ void dispatch_loop( TCPSocket& tunnel_listener,
     
     // Message reconstructor for parsing messages from TunnelClient
     TunnelMessageReconstructor reconstructor;
-    reconstructor.setVerbose(false);  // Set to true for debugging
 
     while( cont_loop )
     {
@@ -113,7 +112,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                 // Interrupted by signal, retry
                 continue;
             }
-            perror( "Select failed. ");
+            LOG_ERROR << "Select faliled: " << strerror(errno) << std::endl;
             break;
         }
 

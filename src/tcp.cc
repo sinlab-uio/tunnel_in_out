@@ -25,7 +25,7 @@ TCPSocket::TCPSocket( const TCPSocket& listener )
     _sock = ::accept( listener.socket(), peer.get(), &peerlen );
     if( _sock < 0 )
     {
-        LOG_WARN << "Failed to create TCP socket from a listener" << std::endl;
+        LOG_ERROR << "Failed to create TCP socket from a listener" << std::endl;
         return;
     }
 

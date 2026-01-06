@@ -87,9 +87,6 @@ void dispatch_loop( TCPSocket& tunnel,
     read_sockets.push_back( tunnel.socket() );
     read_sockets.push_back( udp_forwarder.socket() );
     
-    // Set reconstructor verbosity
-    reconstructor.setVerbose(verbose);
-
     while( cont_loop )
     {
         std::vector<int> write_sockets;
