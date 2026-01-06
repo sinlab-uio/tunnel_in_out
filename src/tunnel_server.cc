@@ -67,7 +67,7 @@ int main( int argc, char* argv[] )
 
     dispatch_loop( tunnel_listener, outside_udp, outside_tcp_listener, tunnel, webSock );
     
-    std::cout << "= TunnelIn shutting down" << std::endl;
+    std::cout << "= TunnelServer shutting down" << std::endl;
     return 0;
 }
 
