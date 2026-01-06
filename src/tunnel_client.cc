@@ -8,8 +8,8 @@
 
 #include <unistd.h> // for close
 
-#include "tunnel_out_argp.h"
-#include "tunnel_out_dispatch.h"
+#include "tunnel_client_argp.h"
+#include "tunnel_client_dispatch.h"
 #include "sockaddr.h"
 #include "udp.h"
 #include "tcp.h"
@@ -20,9 +20,9 @@ int main( int argc, char* argv[] )
 
     callArgParse( argc, argv, args );
 
-    std::cerr << "= ===================" << std::endl;
-    std::cerr << "= ==== TunnelOut ====" << std::endl;
-    std::cerr << "= ===================" << std::endl;
+    std::cerr << "= ======================" << std::endl;
+    std::cerr << "= ==== TunnelClient ====" << std::endl;
+    std::cerr << "= ======================" << std::endl;
     std::cout << "= Press Q<ret> to quit" << std::endl;
 
     TCPSocket tunnel( args.tunnel_host, args.tunnel_port );

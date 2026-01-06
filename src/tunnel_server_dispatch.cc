@@ -9,7 +9,7 @@
 #include <string.h> // for strerror
 #include <errno.h>
 
-#include "tunnel_in_dispatch.h"
+#include "tunnel_server_dispatch.h"
 #include "sockaddr.h"
 
 #define CERR std::cerr << __FILE__ << ":" << __LINE__
@@ -72,7 +72,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
             {
                 std::cout << "= Q pressed by user. Quitting." << std::endl
                           << "= Note: TCP tunnel port will be unavailable for up to a minute" << std::endl
-                          << "=       if TunnelOut was currently connected." << std::endl;
+                          << "=       if TunnelClient was currently connected." << std::endl;
                 cont_loop = false;
             }
         }
@@ -98,7 +98,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                 
                 tunnel.swap( tcp_conn );
                 sockets.push_back( tunnel->socket() );
-                std::cout << "= Connection from TunnelOut established on port " << tunnel->getPort()
+                std::cout << "= Connection from TunnelClient established on port " << tunnel->getPort()
                           << ", socket " << tunnel->socket() << std::endl;
             }
             else
@@ -186,7 +186,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                 }
                 else
                 {
-                    CERR << " Tunnel to TunnelOut isn't established. Drop UDP packets." << std::endl;
+                    CERR << " Tunnel to TunnelClient isn't established. Drop UDP packets." << std::endl;
                 }
             }
         }
@@ -219,7 +219,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
             }
             else
             {
-                // Data received on tunnel from TunnelOut - could be responses
+                // Data received on tunnel from TunnelClient - could be responses
                 CERR << " Received " << retval << " bytes on tunnel (currently ignored)" << std::endl;
             }
         }

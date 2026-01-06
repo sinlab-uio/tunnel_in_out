@@ -8,7 +8,7 @@
 #include <unistd.h> // for close
 #include <string.h> // for strerror
 
-#include "tunnel_in_dispatch.h"
+#include "tunnel_client_dispatch.h"
 #include "sockaddr.h"
 #include "udp_packet.h"
 #include "udp_reconstructor.h"

@@ -8,8 +8,8 @@
 
 #include <unistd.h> // for close
 
-#include "tunnel_in_argp.h"
-#include "tunnel_in_dispatch.h"
+#include "tunnel_server_argp.h"
+#include "tunnel_server_dispatch.h"
 #include "sockaddr.h"
 #include "udp.h"
 #include "tcp.h"
@@ -20,9 +20,9 @@ int main( int argc, char* argv[] )
 
     callArgParse( argc, argv, args );
 
-    std::cout << "= ===================" << std::endl;
-    std::cout << "= ==== TunnelIn =====" << std::endl;  // FIXED: was "TunnelOut"
-    std::cout << "= ===================" << std::endl;
+    std::cout << "= =======================" << std::endl;
+    std::cout << "= ==== TunnelServer =====" << std::endl;
+    std::cout << "= =======================" << std::endl;
     std::cout << "= Start this program first" << std::endl;
     std::cout << "= Press Q<ret> to quit" << std::endl;
 
@@ -32,7 +32,7 @@ int main( int argc, char* argv[] )
         std::cerr << "Failed to bind the tunnel listening socket to port " << args.tunnel_tcp << " (quitting)" << std::endl;
         return -1;
     }
-    std::cout << "= Waiting for TCP connection from TunnelOut on port " << tunnel_listener.getPort() << ", socket " << tunnel_listener.socket() << std::endl;
+    std::cout << "= Waiting for TCP connection from TunnelClient on port " << tunnel_listener.getPort() << ", socket " << tunnel_listener.socket() << std::endl;
 
     UDPSocket outside_udp( args.outside_udp );
     if( outside_udp.valid() == false )

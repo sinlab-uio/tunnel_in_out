@@ -4,14 +4,14 @@
 #include <stdint.h>
 #include <argp.h>
 #include "generic_argp.h"
-#include "tunnel_out_argp.h"
+#include "tunnel_client_argp.h"
 
-const char *argp_program_version = "tunnel_out 0.1";
+const char *argp_program_version = "TunnelClient 0.1";
 const char *argp_program_bug_address = "griff@uio.no";
 static char doc[] = "\n"
-                    "TunnelOut runs on the inside of a firewall. It connects actively to TunnelIn. "
+                    "TunnelClient runs on the inside of a firewall. It connects actively to TunnelServer. "
                     "After that, it provides user-space splicing of a specified TCP connection and turns data arriving the tunnel back into UDP packets.\n"
-                    "  <tunnel-rl>\tThe URL, hostname:port or 'dotted decimal address':port of the TunnelIn machine.\n";
+                    "  <tunnel-rl>\tThe URL, hostname:port or 'dotted decimal address':port of the TunnelServer machine.\n";
 static char args_doc[] = "<tunnel-url>";
 static struct argp_option options[] = {
     { "fwd-udp",      'u', "string",    0, "(mandatory) The UDP URL of the local machine."},

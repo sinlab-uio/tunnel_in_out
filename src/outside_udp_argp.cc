@@ -8,8 +8,8 @@
 const char *argp_program_version = "outside_udp 0.1";
 const char *argp_program_bug_address = "griff@uio.no";
 static char doc[] = "\n"
-                    "OutsideUDP runs on the outside of a firewall. It sends dummy UDP packets to TunnelIn.\n"
-                    "  <tunnel-url>\tthe hostname:port or 'dotted decimal address':port pointing to the TunnelIn machine.\n";
+                    "OutsideUDP runs on the outside of a firewall. It sends dummy UDP packets to TunnelServer.\n"
+                    "  <tunnel-url>\tthe hostname:port or 'dotted decimal address':port pointing to the TunnelServer machine.\n";
 static char args_doc[] = "<tunnel-url>";
 static struct argp_option options[] = {
     { "send-too-long", 'x', 0, 0, "Optional, attempt to send 10000-byte packet."},
