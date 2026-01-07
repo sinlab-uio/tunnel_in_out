@@ -13,6 +13,13 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_BUILD_TYPE Debug)
 
+# ==============================================================================
+# GNUInstallDirs CMake module
+# - Define GNU standard installation directories
+# - Provides install directory variables as defined by the GNU Coding Standards.
+# ==============================================================================
+include(GNUInstallDirs)
+
 include(CheckFunctionExists) # to check for argp in libc
 
 find_path(ARGP_INCLUDE_PATH "argp.h"
@@ -68,4 +75,18 @@ target_link_libraries( OutsideUDP tunnelNet ${ARGP_LIBRARY} )
 
 add_executable( test test.cc )
 target_link_libraries( test tunnelNet ${ARGP_LIBRARY} )
+
+install(TARGETS TunnelServer TunnelClient OutsideUDP )
+
+######################################
+# SUMMARY
+######################################
+message("\n")
+message("******************************************")
+message("Building configuration:\n")
+message(STATUS "Tunnel version: " ${PROJECT_VERSION})
+message(STATUS "Build type: " ${CMAKE_BUILD_TYPE})
+message(STATUS "Build Shared libs: " ${BUILD_SHARED_LIBS})
+message(STATUS "Generate position independent code: " ${CMAKE_POSITION_INDEPENDENT_CODE})
+message(STATUS "Install path: " ${CMAKE_INSTALL_PREFIX})
 
