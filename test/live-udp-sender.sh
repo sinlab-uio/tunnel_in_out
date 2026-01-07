@@ -8,5 +8,5 @@ echo "= Python_SendTest.py webrtc.mlab.no 5349 < DUMP.txt"
 echo "================================================================================"
 
 # iperf client sends UDP packets to port 2345 (outer tunnel UDP)
-python3 ./Python_SendTest.py webrtc.mlab.no 5349 < DUMP.txt
+/opt/homebrew/bin/python3 ./Python_SendTest.py webrtc.mlab.no 5349 < DUMP.txt
 
