@@ -4,17 +4,17 @@ A high-performance, bidirectional tunnel for forwarding UDP and TCP traffic thro
 
 ## AI declaration
 
-Tunneling TCP connection, Tunnel reconnection and README.md written by Claude.AI.
+Tunneling TCP connection, Tunnel reconnection and the initial README.md written by Claude.AI.
 
 ## Features
 
-- ✅ **Bidirectional UDP forwarding** - Forward UDP packets in both directions
-- ✅ **TCP connection multiplexing** - Support multiple simultaneous TCP connections through a single tunnel
-- ✅ **Automatic reconnection** - TunnelClient automatically reconnects when tunnel connection is lost
-- ✅ **Connection preservation** - TCP connections survive tunnel disconnections transparently
-- ✅ **Low latency optimization** - TCP_NODELAY and non-blocking sockets minimize delays
-- ✅ **Professional logging** - Configurable verbose mode with file:line information
-- ✅ **Extensible protocol** - 8-byte header supports future enhancements
+- **Bidirectional UDP forwarding** - Forward UDP packets in both directions
+- **TCP connection multiplexing** - Support multiple simultaneous TCP connections through a single tunnel
+- **Automatic reconnection** - TunnelClient automatically reconnects when tunnel connection is lost
+- **Connection preservation** - TCP connections survive tunnel disconnections transparently
+- **Low latency optimization** - TCP_NODELAY and non-blocking sockets minimize delays
+- **Professional logging** - Configurable verbose mode with file:line information
+- **Extensible protocol** - 8-byte header supports future enhancements
 
 ## Architecture
 
@@ -233,11 +233,11 @@ TunnelClient automatically handles connection loss:
 
 When the tunnel disconnects:
 
-- ✅ **TCP connections preserved** on both sides
-- ✅ **OS buffers hold data** during disconnection
-- ✅ **Automatic resume** after reconnection
-- ✅ **No re-authentication** needed
-- ✅ **Minimal data loss** (only in-flight tunnel data)
+- **TCP connections preserved** on both sides
+- **OS buffers hold data** during disconnection
+- **Automatic resume** after reconnection
+- **No re-authentication** needed
+- **Minimal data loss** (only in-flight tunnel data)
 
 **Example: HTTP Download**
 ```
@@ -547,7 +547,7 @@ This enables:
 
 ### Important Notes
 
-⚠️ **This tunnel provides NO encryption or authentication**
+**This tunnel provides NO encryption or authentication**
 
 - All traffic passes through the tunnel in **plaintext**
 - Anyone with access to the tunnel can read/modify data
@@ -585,10 +585,6 @@ Contributions are welcome! Please:
 ## License
 
 [Specify your license here]
-
-## Authors
-
-[Your name/organization]
 
 ## Acknowledgments
 
