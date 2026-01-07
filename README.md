@@ -2,10 +2,6 @@
 
 A high-performance, bidirectional tunnel for forwarding UDP and TCP traffic through restrictive firewalls. Supports multiple simultaneous TCP connections with automatic reconnection and connection preservation.
 
-## AI declaration
-
-Tunneling TCP connection, Tunnel reconnection and the initial README.md written by Claude.AI.
-
 ## Features
 
 - **Bidirectional UDP forwarding** - Forward UDP packets in both directions
@@ -588,9 +584,9 @@ This work is licensed under the Affero Gnu Public License.
 
 This requires the publication, under the same license, of derived works if they are used to offer a service over the network. This license was chosen with full awareness of its extremely restrictive nature because of the potential for hiding malicious actions in derived works that offer a tunnel service.
 
-## Acknowledgments
 
-- Built with C++17
-- Uses argp for command-line parsing
-- Inspired by various tunneling tools (ssh, stunnel, socat)
+## AI declaration
+
+Tunneling TCP connection, Tunnel reconnection and the initial README.md written by Claude.AI.
+
 
