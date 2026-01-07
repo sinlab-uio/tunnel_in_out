@@ -584,7 +584,9 @@ Contributions are welcome! Please:
 
 ## License
 
-[Specify your license here]
+This work is licensed under the Affero Gnu Public License.
+
+This requires the publication, under the same license, of derived works if they are used to offer a service over the network. This license was chosen with full awareness of its extremely restrictive nature because of the potential for hiding malicious actions in derived works that offer a tunnel service.
 
 ## Acknowledgments
 
