@@ -3,7 +3,7 @@ import socket
 import sys
 import time
 
-# Usage: ./udp_send.py localhost 2345 < file.txt
+# Usage: ./.Python_SendTest.py localhost 2345 < file.txt
 host = sys.argv[1]
 port = int(sys.argv[2])
 
