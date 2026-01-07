@@ -14,5 +14,5 @@ echo "==========================================================================
 # tunnel server listens for tunnel connects on port 1234
 #                       for external TCP connections on port 2345
 #                       for external UDP packets on port 2345
-TunnelServer -t 5349 -u 5349 1234
+TunnelServer -v -t 5349 -u 5349 3478
 
