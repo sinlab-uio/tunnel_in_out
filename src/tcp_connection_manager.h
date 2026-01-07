@@ -2,6 +2,7 @@
 
 #include <map>
 #include <memory>
+#include <vector>
 #include "tcp.h"
 #include "sockaddr.h"
 
