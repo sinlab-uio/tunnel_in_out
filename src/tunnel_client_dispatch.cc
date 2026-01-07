@@ -27,6 +27,9 @@ char tcp_tunnel_buffer[max_buffer_size];
 
 TunnelMessageReconstructor reconstructor;
 
+// Static TCP connection manager - preserved across reconnections
+static TCPConnectionManager tcp_connections;
+
 // Helper function to send a tunnel message back to server
 // Returns true on success, false on failure
 bool sendTunnelMessage(TCPSocket& tunnel, 
@@ -68,7 +71,10 @@ bool sendTunnelMessage(TCPSocket& tunnel,
     return true;
 }
 
-void dispatch_loop( TCPSocket& tunnel,
+// Dispatch loop for TunnelClient
+// Returns true if user requested quit (Q pressed)
+// Returns false if connection was lost (should reconnect)
+bool dispatch_loop( TCPSocket& tunnel,
                     UDPSocket& udp_forwarder,
                     std::shared_ptr<TCPSocket> webSock,
                     const SockAddr& dest_udp,
@@ -77,14 +83,23 @@ void dispatch_loop( TCPSocket& tunnel,
     fd_set read_fds;
     int    fd_max = 0;
     bool   cont_loop = true;
+    bool   user_quit = false;  // Track if user requested quit
 
     std::vector<int> read_sockets;
     read_sockets.push_back( 0 ); // stdin
     read_sockets.push_back( tunnel.socket() );
     read_sockets.push_back( udp_forwarder.socket() );
     
-    // TCP connection manager for multiplexing TCP connections
-    TCPConnectionManager tcp_connections;
+    // Log existing TCP connections on entry (after reconnection)
+    if (tcp_connections.connectionCount() > 0)
+    {
+        LOG_INFO << "Dispatch loop started with " << tcp_connections.connectionCount() 
+                 << " existing TCP connections preserved" << std::endl;
+        for (uint32_t conn_id : tcp_connections.getAllConnIds())
+        {
+            LOG_DEBUG << "  Preserved conn_id=" << conn_id << std::endl;
+        }
+    }
 
     while( cont_loop )
     {
@@ -99,7 +114,7 @@ void dispatch_loop( TCPSocket& tunnel,
             fd_max = std::max( fd_max, it );
         }
         
-        // Add all TCP connection sockets
+        // Add all TCP connection sockets (preserved across reconnections)
         auto tcp_sockets = tcp_connections.getAllSockets();
         for (int sock : tcp_sockets)
         {
@@ -107,7 +122,8 @@ void dispatch_loop( TCPSocket& tunnel,
             FD_SET( sock, &read_fds );
             fd_max = std::max( fd_max, sock );
         }
-        LOG_DEBUG << ostr.str() <<  std::endl;
+        
+        LOG_DEBUG << ostr.str() << std::endl;
 
         int retval = ::select( fd_max+1, &read_fds, nullptr, nullptr, nullptr );
 
@@ -115,6 +131,7 @@ void dispatch_loop( TCPSocket& tunnel,
         {
             if (errno == EINTR)
             {
+                // Interrupted by signal, retry
                 continue;
             }
             LOG_ERROR << "Select failed: " << strerror(errno) << std::endl;
@@ -123,28 +140,29 @@ void dispatch_loop( TCPSocket& tunnel,
 
         if( FD_ISSET( 0, &read_fds ) )
         {
-            LOG_DEBUG << std::endl;
             int c = getchar( );
             if( c == 'q' || c == 'Q' )
             {
                 std::cout << "= Q pressed by user. Quitting." << std::endl;
+                user_quit = true;
                 cont_loop = false;
             }
         }
 
         if( FD_ISSET( tunnel.socket(), &read_fds ) )
         {
-            LOG_DEBUG << std::endl;
             int retval = tunnel.recv( tcp_tunnel_buffer, max_buffer_size );
             if( retval < 0 )
             {
                 LOG_ERROR << "Error in TCP tunnel, socket " << tunnel.socket() << ". "
                           << strerror(errno) << std::endl;
+                LOG_INFO << "Tunnel connection lost. TCP connections will be preserved for reconnection." << std::endl;
                 cont_loop = false;
             }
             else if( retval == 0 )
             {
-                LOG_INFO << "Socket " << tunnel.socket() << " closed. Quitting." << std::endl;
+                LOG_INFO << "Tunnel socket closed by server." << std::endl;
+                LOG_INFO << "TCP connections will be preserved for reconnection." << std::endl;
                 cont_loop = false;
             }
             else
@@ -204,6 +222,15 @@ void dispatch_loop( TCPSocket& tunnel,
                         case TunnelMessageType::TCP_OPEN:
                         {
                             LOG_INFO << "TCP_OPEN received for conn_id=" << msg.conn_id << std::endl;
+                            
+                            // Check if connection already exists (after reconnection)
+                            if (tcp_connections.hasConnection(msg.conn_id))
+                            {
+                                LOG_WARN << "TCP_OPEN for existing conn_id=" << msg.conn_id 
+                                         << " - connection already preserved from before reconnection" << std::endl;
+                                // Connection already exists, don't create new one
+                                break;
+                            }
                             
                             // Create outgoing TCP connection to destination
                             std::shared_ptr<TCPSocket> tcp_conn(new TCPSocket(dest_tcp.getAddress().c_str(), 
@@ -283,8 +310,6 @@ void dispatch_loop( TCPSocket& tunnel,
 
         if( FD_ISSET( udp_forwarder.socket(), &read_fds ) )
         {
-            LOG_DEBUG << std::endl;
-            
             // Receive UDP response from the destination
             SockAddr response_sender;
             int retval = udp_forwarder.recv( udp_packet_buffer, max_buffer_size, response_sender );
@@ -310,6 +335,7 @@ void dispatch_loop( TCPSocket& tunnel,
                 else
                 {
                     LOG_ERROR << "Failed to send UDP response through tunnel" << std::endl;
+                    LOG_INFO << "Tunnel connection lost while sending. Will reconnect." << std::endl;
                     cont_loop = false;
                 }
             }
@@ -323,6 +349,7 @@ void dispatch_loop( TCPSocket& tunnel,
         }
 
         // Check all TCP connections to destination for data
+        // These connections are preserved across tunnel reconnections
         for (uint32_t conn_id : tcp_connections.getAllConnIds())
         {
             auto* conn = tcp_connections.getConnection(conn_id);
@@ -338,6 +365,8 @@ void dispatch_loop( TCPSocket& tunnel,
                     // Connection closed by destination
                     LOG_INFO << "Destination TCP connection closed, conn_id=" << conn_id << std::endl;
                     
+                    // Try to send TCP_CLOSE through tunnel
+                    // If tunnel is down, this will fail but connection will be cleaned up
                     sendTunnelMessage(tunnel, conn_id, TunnelMessageType::TCP_CLOSE, nullptr, 0);
                     tcp_connections.removeConnection(conn_id);
                 }
@@ -369,14 +398,42 @@ void dispatch_loop( TCPSocket& tunnel,
                     if (!success)
                     {
                         LOG_ERROR << "Failed to send TCP_DATA for conn_id=" << conn_id << std::endl;
-                        tcp_connections.removeConnection(conn_id);
+                        LOG_INFO << "Tunnel connection lost while sending TCP data. Will reconnect." << std::endl;
+                        // Don't remove connection - it will be preserved for reconnection
+                        cont_loop = false;
+                        break;  // Exit loop to trigger reconnection
                     }
                 }
             }
         }
     }
     
-    // Clean up all TCP connections on exit
-    LOG_INFO << "Closing " << tcp_connections.connectionCount() << " TCP connections" << std::endl;
+    // Cleanup before exiting dispatch loop
+    if (user_quit)
+    {
+        LOG_INFO << "User quit - closing all TCP connections" << std::endl;
+        
+        // Close all TCP connections gracefully on user quit
+        for (uint32_t conn_id : tcp_connections.getAllConnIds())
+        {
+            LOG_DEBUG << "Closing TCP connection conn_id=" << conn_id << std::endl;
+            tcp_connections.removeConnection(conn_id);
+        }
+    }
+    else
+    {
+        LOG_INFO << "Tunnel disconnected - preserving " 
+                 << tcp_connections.connectionCount() 
+                 << " TCP connections for reconnection" << std::endl;
+        // TCP connections are NOT removed - they remain in tcp_connections
+        // They will continue to be monitored after reconnection
+    }
+    
+    // Clear any remaining data in reconstructor
+    LOG_DEBUG << "Flushing reconstructor buffer. Remaining messages: " 
+              << reconstructor.messageCount() << std::endl;
+    
+    // Return true if user quit, false if connection lost
+    return user_quit;
 }
 

@@ -91,7 +91,8 @@ void dispatch_loop( TCPSocket& tunnel_listener,
     TunnelMessageReconstructor reconstructor;
     
     // TCP connection manager for multiplexing TCP connections
-    TCPConnectionManager tcp_connections;
+    // STATIC - preserved across tunnel reconnections
+    static TCPConnectionManager tcp_connections;
 
     while( cont_loop )
     {
@@ -163,6 +164,14 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                 
                 tunnel.swap( tcp_conn );
                 sockets.push_back( tunnel->socket() );
+                
+                // Log preserved TCP connections after tunnel reconnect
+                if (tcp_connections.connectionCount() > 0)
+                {
+                    LOG_INFO << "Tunnel reconnected with " << tcp_connections.connectionCount() 
+                             << " preserved outside TCP connections" << std::endl;
+                }
+                
                 std::cout << "= Connection from TunnelClient established on port " << tunnel->getPort()
                           << ", socket " << tunnel->socket() << std::endl;
             }
