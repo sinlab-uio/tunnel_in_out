@@ -16,7 +16,7 @@ TCPSocket::TCPSocket( uint16_t port )
     bool success = createServer( port );
 }
 
-TCPSocket::TCPSocket( const TCPSocket& listener )
+TCPSocket::TCPSocket( const TCPSocket& listener, bool /*dummy*/ )
 {
     SockAddr peer;
     socklen_t peerlen;
@@ -25,7 +25,7 @@ TCPSocket::TCPSocket( const TCPSocket& listener )
     _sock = ::accept( listener.socket(), peer.get(), &peerlen );
     if( _sock < 0 )
     {
-        LOG_ERROR << "Failed to create TCP socket from a listener, reason: " << strerror(errno) << std::endl;
+        LOG_ERROR << "Failed to create TCP socket from a listener socket " << listener.socket() << ", reason: " << strerror(errno) << " peer size: " << peer.size() << std::endl;
         return;
     }
 
@@ -55,6 +55,8 @@ TCPSocket::TCPSocket( const std::string& host, uint16_t port )
 
     if( success )
         _valid = true;
+    else
+        _valid = false;
 }
 
 TCPSocket::~TCPSocket( )

@@ -37,7 +37,9 @@ public:
      * (accept a connection).
      * Check valid() to verify if this worked.
      */
-    TCPSocket( const TCPSocket& listener );
+    TCPSocket( const TCPSocket& listener, bool dummy );
+
+    TCPSocket( const TCPSocket& orig ) = delete;
 
     /* Create a socket and connect it to host:port.
      * Check valid() to verify if this worked.

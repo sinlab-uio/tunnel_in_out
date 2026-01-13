@@ -147,7 +147,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
         if( FD_ISSET( tunnel_listener.socket(), &fds ) )
         {
             /* Create a new TCP socket from the connect request. */
-            std::shared_ptr<TCPSocket> tcp_conn( new TCPSocket( tunnel_listener ) );
+            std::shared_ptr<TCPSocket> tcp_conn( new TCPSocket( tunnel_listener, true ) );
             if( tcp_conn->valid() )
             {
                 // Close old tunnel if exists
@@ -184,7 +184,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
         if( FD_ISSET( outside_tcp_listener.socket(), &fds ) )
         {
             // New TCP connection from outside
-            std::shared_ptr<TCPSocket> tcp_conn( new TCPSocket( outside_tcp_listener ) );
+            std::shared_ptr<TCPSocket> tcp_conn( new TCPSocket( outside_tcp_listener, true ) );
             if( tcp_conn->valid() )
             {
                 // Set non-blocking to avoid delaying UDP

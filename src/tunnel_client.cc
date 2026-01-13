@@ -18,7 +18,7 @@
 
 // Attempt to connect to TunnelServer with retry
 // Returns valid TCPSocket or invalid socket if max retries exceeded
-TCPSocket connectWithRetry(const std::string& host, uint16_t port, 
+TCPSocket* connectWithRetry(const std::string& host, uint16_t port, 
                            int max_attempts = 5, int delay_seconds = 2)
 {
     for (int attempt = 1; attempt <= max_attempts; attempt++)
@@ -26,14 +26,15 @@ TCPSocket connectWithRetry(const std::string& host, uint16_t port,
         LOG_INFO << "Connection attempt " << attempt << " of " << max_attempts 
                  << " to " << host << ":" << port << std::endl;
         
-        TCPSocket tunnel(host, port);
+        TCPSocket* tunnel = new TCPSocket(host, port);
         
-        if (tunnel.valid())
+        if (tunnel->valid())
         {
             LOG_INFO << "Successfully connected to " << host << ":" << port 
-                     << " on socket " << tunnel.socket() << std::endl;
+                     << " on socket " << tunnel->socket() << std::endl;
             return tunnel;
         }
+        delete tunnel;
         
         LOG_WARN << "Connection attempt " << attempt << " failed" << std::endl;
         
@@ -45,7 +46,7 @@ TCPSocket connectWithRetry(const std::string& host, uint16_t port,
     }
     
     LOG_ERROR << "Failed to connect after " << max_attempts << " attempts" << std::endl;
-    return TCPSocket();  // Return invalid socket
+    return nullptr;
 }
 
 int main( int argc, char* argv[] )
@@ -80,13 +81,16 @@ int main( int argc, char* argv[] )
     while (continue_running)
     {
         // Connect to TunnelServer with retry
-        TCPSocket tunnel = connectWithRetry(args.tunnel_host, args.tunnel_port);
+        TCPSocket* tunnel = connectWithRetry(args.tunnel_host, args.tunnel_port);
+        LOG_INFO << "connectWithRetry returned" << std::endl;
         
-        if (!tunnel.valid())
+        if (!tunnel || !tunnel->valid())
         {
             LOG_ERROR << "Could not establish tunnel connection. Exiting." << std::endl;
+	    if(tunnel) delete tunnel;
             return -1;
         }
+        LOG_INFO << "valid tunnel established on socket " << tunnel->socket() << std::endl;
         
         reconnect_count++;
         if (reconnect_count > 1)
@@ -100,13 +104,16 @@ int main( int argc, char* argv[] )
         }
         
         std::cout << "= Connected to " << args.tunnel_host << ":" << args.tunnel_port
-                  << " on socket " << tunnel.socket() << std::endl;
+                  << " on socket " << tunnel->socket() << std::endl;
         
         // Run dispatch loop
         // Returns true if user requested quit, false if connection lost
-        bool user_quit = dispatch_loop( tunnel, udp_forwarder, webSock, 
+        bool user_quit = dispatch_loop( *tunnel, udp_forwarder, webSock, 
                                        dest_udp, dest_tcp );
         
+
+	delete tunnel;
+
         if (user_quit)
         {
             std::cout << "= User requested quit. Exiting." << std::endl;
