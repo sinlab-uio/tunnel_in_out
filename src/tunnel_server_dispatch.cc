@@ -12,6 +12,7 @@
 
 #include "tunnel_server_dispatch.h"
 #include "tunnel_protocol.h"
+#include "tunnel_send_message.h"
 #include "tunnel_message_reconstructor.h"
 #include "tcp_connection_manager.h"
 #include "sockaddr.h"
@@ -25,47 +26,6 @@ static const size_t max_tcp_data_size = 16384;  // 16KB per TCP read
 static char udp_packet_buffer[max_udp_packet_size];
 static char tcp_data_buffer[max_tcp_data_size];
 static char tcp_tunnel_buffer[max_buffer_size];
-
-// Helper function to send a tunnel message
-// Returns true on success, false on failure
-bool sendTunnelMessage(const std::unique_ptr<TCPSocket>& tunnel, 
-                       uint32_t conn_id,
-                       TunnelMessageType type,
-                       const char* payload,
-                       uint16_t payload_len)
-{
-    // Validate payload length
-    if (payload_len > TunnelProtocol::MAX_PAYLOAD_SIZE)
-    {
-        LOG_ERROR << "Payload too large: " << payload_len << std::endl;
-        return false;
-    }
-    
-    // Create header
-    TunnelMessageHeader header;
-    TunnelProtocol::createHeader(header, conn_id, payload_len, type);
-    
-    // Send header
-    int sent = tunnel->send(&header, TunnelProtocol::HEADER_SIZE);
-    if (sent != TunnelProtocol::HEADER_SIZE)
-    {
-        LOG_ERROR << "Failed to send message header" << std::endl;
-        return false;
-    }
-    
-    // Send payload (if any)
-    if (payload_len > 0)
-    {
-        sent = tunnel->send(payload, payload_len);
-        if (sent != payload_len)
-        {
-            LOG_ERROR << "Failed to send message payload" << std::endl;
-            return false;
-        }
-    }
-    
-    return true;
-}
 
 void dispatch_loop( TCPSocket& tunnel_listener,
                     UDPSocket& outside_udp,
@@ -187,7 +147,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
         if( FD_ISSET( outside_tcp_listener.socket(), &fds ) )
         {
             // New TCP connection from outside
-            std::shared_ptr<TCPSocket> tcp_conn( new TCPSocket( outside_tcp_listener, true ) );
+            std::unique_ptr<TCPSocket> tcp_conn( new TCPSocket( outside_tcp_listener, true ) );
             if( tcp_conn->valid() )
             {
                 // Set non-blocking to avoid delaying UDP

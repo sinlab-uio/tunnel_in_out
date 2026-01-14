@@ -12,6 +12,7 @@
 
 #include "tunnel_client_dispatch.h"
 #include "tunnel_protocol.h"
+#include "tunnel_send_message.h"
 #include "tunnel_message_reconstructor.h"
 #include "tcp_connection_manager.h"
 #include "sockaddr.h"
@@ -29,47 +30,6 @@ TunnelMessageReconstructor reconstructor;
 
 // Static TCP connection manager - preserved across reconnections
 static TCPConnectionManager tcp_connections;
-
-// Helper function to send a tunnel message back to server
-// Returns true on success, false on failure
-bool sendTunnelMessage(const std::unique_ptr<TCPSocket>& tunnel, 
-                       uint32_t conn_id,
-                       TunnelMessageType type,
-                       const char* payload,
-                       uint16_t payload_len)
-{
-    // Validate payload length
-    if (payload_len > TunnelProtocol::MAX_PAYLOAD_SIZE)
-    {
-        LOG_ERROR << "Payload too large: " << payload_len << std::endl;
-        return false;
-    }
-    
-    // Create header
-    TunnelMessageHeader header;
-    TunnelProtocol::createHeader(header, conn_id, payload_len, type);
-    
-    // Send header
-    int sent = tunnel->send(&header, TunnelProtocol::HEADER_SIZE);
-    if (sent != TunnelProtocol::HEADER_SIZE)
-    {
-        LOG_ERROR << "Failed to send message header" << std::endl;
-        return false;
-    }
-    
-    // Send payload (if any)
-    if (payload_len > 0)
-    {
-        sent = tunnel->send(payload, payload_len);
-        if (sent != payload_len)
-        {
-            LOG_ERROR << "Failed to send message payload" << std::endl;
-            return false;
-        }
-    }
-    
-    return true;
-}
 
 // Dispatch loop for TunnelClient
 // Returns true if user requested quit (Q pressed)
@@ -233,8 +193,8 @@ bool dispatch_loop( const std::unique_ptr<TCPSocket>& tunnel,
                             }
                             
                             // Create outgoing TCP connection to destination
-                            std::shared_ptr<TCPSocket> tcp_conn(new TCPSocket(dest_tcp.getAddress().c_str(), 
-                                                                               dest_tcp.getPort()));
+                            std::unique_ptr<TCPSocket> tcp_conn( new TCPSocket(dest_tcp.getAddress().c_str(), 
+                                                                               dest_tcp.getPort()) );
                             
                             if (tcp_conn->valid())
                             {
@@ -255,7 +215,7 @@ bool dispatch_loop( const std::unique_ptr<TCPSocket>& tunnel,
                                 
                                 // Send TCP_CLOSE back to server
                                 sendTunnelMessage(tunnel, msg.conn_id, 
-                                                 TunnelMessageType::TCP_CLOSE, nullptr, 0);
+                                                  TunnelMessageType::TCP_CLOSE, nullptr, 0);
                             }
                             break;
                         }

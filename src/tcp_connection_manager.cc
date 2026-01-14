@@ -9,11 +9,11 @@ uint32_t TCPConnectionManager::allocateConnId()
     return _next_conn_id++;
 }
 
-void TCPConnectionManager::addConnection(uint32_t conn_id, std::shared_ptr<TCPSocket> socket)
+void TCPConnectionManager::addConnection(uint32_t conn_id, std::unique_ptr<TCPSocket>& socket)
 {
     if (socket && socket->valid())
     {
-        _connections.emplace(conn_id, Connection(conn_id, socket));
+        _connections.emplace( conn_id, Connection( conn_id, std::move(socket) ) );
         _socket_to_conn_id[socket->socket()] = conn_id;
     }
 }
