@@ -264,3 +264,10 @@ int TCPSocket::send( const void* buffer, size_t buflen )
     return totalSent;
 }
 
+SockAddr TCPSocket::getPeer( )
+{
+    SockAddr peer;
+    if( _valid && peer.getPeer( _sock ) ) return peer;
+    return SockAddr();
+}
+

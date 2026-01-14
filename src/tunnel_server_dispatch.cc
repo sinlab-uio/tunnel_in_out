@@ -28,7 +28,7 @@ static char tcp_tunnel_buffer[max_buffer_size];
 
 // Helper function to send a tunnel message
 // Returns true on success, false on failure
-bool sendTunnelMessage(TCPSocket& tunnel, 
+bool sendTunnelMessage(const std::unique_ptr<TCPSocket>& tunnel, 
                        uint32_t conn_id,
                        TunnelMessageType type,
                        const char* payload,
@@ -46,7 +46,7 @@ bool sendTunnelMessage(TCPSocket& tunnel,
     TunnelProtocol::createHeader(header, conn_id, payload_len, type);
     
     // Send header
-    int sent = tunnel.send(&header, TunnelProtocol::HEADER_SIZE);
+    int sent = tunnel->send(&header, TunnelProtocol::HEADER_SIZE);
     if (sent != TunnelProtocol::HEADER_SIZE)
     {
         LOG_ERROR << "Failed to send message header" << std::endl;
@@ -56,7 +56,7 @@ bool sendTunnelMessage(TCPSocket& tunnel,
     // Send payload (if any)
     if (payload_len > 0)
     {
-        sent = tunnel.send(payload, payload_len);
+        sent = tunnel->send(payload, payload_len);
         if (sent != payload_len)
         {
             LOG_ERROR << "Failed to send message payload" << std::endl;
@@ -69,13 +69,16 @@ bool sendTunnelMessage(TCPSocket& tunnel,
 
 void dispatch_loop( TCPSocket& tunnel_listener,
                     UDPSocket& outside_udp,
-                    TCPSocket& outside_tcp_listener,
-                    std::shared_ptr<TCPSocket> tunnel,
-                    std::shared_ptr<TCPSocket> webSock )
+                    TCPSocket& outside_tcp_listener )
 {
     fd_set fds;
     int    fd_max = 0;
     bool   cont_loop = true;
+
+    // There can only be one open tunnel at any time.
+    std::unique_ptr<TCPSocket> tunnel;
+
+    // std::shared_ptr<TCPSocket> webSock )
 
     std::vector<int> sockets;
     sockets.push_back( 0 ); // stdin
@@ -147,11 +150,11 @@ void dispatch_loop( TCPSocket& tunnel_listener,
         if( FD_ISSET( tunnel_listener.socket(), &fds ) )
         {
             /* Create a new TCP socket from the connect request. */
-            std::shared_ptr<TCPSocket> tcp_conn( new TCPSocket( tunnel_listener, true ) );
+            std::unique_ptr<TCPSocket> tcp_conn( new TCPSocket( tunnel_listener, true ) );
             if( tcp_conn->valid() )
             {
                 // Close old tunnel if exists
-                if (tunnel && tunnel->valid())
+                if( tunnel && tunnel->valid() )
                 {
                     LOG_INFO << "Replacing existing tunnel connection" << std::endl;
                     // Remove old socket from list
@@ -162,7 +165,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                     }
                 }
                 
-                tunnel.swap( tcp_conn );
+                tunnel = std::move( tcp_conn );
                 sockets.push_back( tunnel->socket() );
                 
                 // Log preserved TCP connections after tunnel reconnect
@@ -202,7 +205,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                     tcp_connections.addConnection(conn_id, tcp_conn);
                     
                     // Send TCP_OPEN message through tunnel
-                    bool success = sendTunnelMessage(*tunnel, 
+                    bool success = sendTunnelMessage(tunnel, 
                                                      conn_id,
                                                      TunnelMessageType::TCP_OPEN,
                                                      nullptr,
@@ -250,7 +253,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                 {
                     // Send UDP packet through tunnel using new protocol
                     // conn_id = 0 for UDP (not using connection multiplexing yet)
-                    bool success = sendTunnelMessage(*tunnel, 
+                    bool success = sendTunnelMessage(tunnel, 
                                                      0,  // conn_id = 0 for UDP
                                                      TunnelMessageType::UDP_PACKET,
                                                      udp_packet_buffer,
@@ -292,7 +295,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                     
                     if (tunnel && tunnel->valid())
                     {
-                        sendTunnelMessage(*tunnel, conn_id, TunnelMessageType::TCP_CLOSE, nullptr, 0);
+                        sendTunnelMessage(tunnel, conn_id, TunnelMessageType::TCP_CLOSE, nullptr, 0);
                     }
                     
                     tcp_connections.removeConnection(conn_id);
@@ -310,7 +313,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                     
                     if (tunnel && tunnel->valid())
                     {
-                        sendTunnelMessage(*tunnel, conn_id, TunnelMessageType::TCP_CLOSE, nullptr, 0);
+                        sendTunnelMessage(tunnel, conn_id, TunnelMessageType::TCP_CLOSE, nullptr, 0);
                     }
                     
                     tcp_connections.removeConnection(conn_id);
@@ -322,7 +325,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                     
                     if (tunnel && tunnel->valid())
                     {
-                        bool success = sendTunnelMessage(*tunnel, 
+                        bool success = sendTunnelMessage(tunnel, 
                                                          conn_id,
                                                          TunnelMessageType::TCP_DATA,
                                                          tcp_data_buffer,
@@ -428,7 +431,7 @@ void dispatch_loop( TCPSocket& tunnel_listener,
                                     LOG_WARN << "Failed to send TCP data to conn_id=" 
                                              << msg.conn_id << std::endl;
                                     tcp_connections.removeConnection(msg.conn_id);
-                                    sendTunnelMessage(*tunnel, msg.conn_id, 
+                                    sendTunnelMessage(tunnel, msg.conn_id, 
                                                      TunnelMessageType::TCP_CLOSE, nullptr, 0);
                                 }
                                 else

@@ -10,7 +10,5 @@
 
 void dispatch_loop( TCPSocket& tunnel_listener,
                     UDPSocket& outside_udp,
-                    TCPSocket& outside_tcp_listener,
-                    std::shared_ptr<TCPSocket> tunnel,
-                    std::shared_ptr<TCPSocket> webSock );
+                    TCPSocket& outside_tcp_listener );
 

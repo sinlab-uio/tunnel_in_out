@@ -4,6 +4,8 @@
 #include <string>
 #include <stdint.h>
 
+#include "sockaddr.h"
+
 class TCPSocket
 {
     int      _sock  { -1 };
@@ -81,5 +83,10 @@ public:
      * Returns the usual socket error codes.
      */
     int send( const void* buffer, size_t buflen );
+
+    /* Get the IP and port information for a connected peer, or an empty
+     * SockAddr structure if there is no valid connection. For printing log info.
+     */
+    SockAddr getPeer( );
 };
 

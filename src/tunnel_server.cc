@@ -63,10 +63,11 @@ int main( int argc, char* argv[] )
     // SockAddr heise( "www.heise.de", 80 );
     // heise.print( std::cout ) << std::endl;
 
-    std::shared_ptr<TCPSocket> tunnel;
-    std::shared_ptr<TCPSocket> webSock;
+    // std::shared_ptr<TCPSocket> tunnel;
+    // std::shared_ptr<TCPSocket> webSock;
 
-    dispatch_loop( tunnel_listener, outside_udp, outside_tcp_listener, tunnel, webSock );
+    // dispatch_loop( tunnel_listener, outside_udp, outside_tcp_listener, tunnel, webSock );
+    dispatch_loop( tunnel_listener, outside_udp, outside_tcp_listener );
     
     std::cout << "= TunnelServer shutting down" << std::endl;
     return 0;

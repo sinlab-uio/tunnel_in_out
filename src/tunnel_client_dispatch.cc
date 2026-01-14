@@ -32,7 +32,7 @@ static TCPConnectionManager tcp_connections;
 
 // Helper function to send a tunnel message back to server
 // Returns true on success, false on failure
-bool sendTunnelMessage(TCPSocket& tunnel, 
+bool sendTunnelMessage(const std::unique_ptr<TCPSocket>& tunnel, 
                        uint32_t conn_id,
                        TunnelMessageType type,
                        const char* payload,
@@ -50,7 +50,7 @@ bool sendTunnelMessage(TCPSocket& tunnel,
     TunnelProtocol::createHeader(header, conn_id, payload_len, type);
     
     // Send header
-    int sent = tunnel.send(&header, TunnelProtocol::HEADER_SIZE);
+    int sent = tunnel->send(&header, TunnelProtocol::HEADER_SIZE);
     if (sent != TunnelProtocol::HEADER_SIZE)
     {
         LOG_ERROR << "Failed to send message header" << std::endl;
@@ -60,7 +60,7 @@ bool sendTunnelMessage(TCPSocket& tunnel,
     // Send payload (if any)
     if (payload_len > 0)
     {
-        sent = tunnel.send(payload, payload_len);
+        sent = tunnel->send(payload, payload_len);
         if (sent != payload_len)
         {
             LOG_ERROR << "Failed to send message payload" << std::endl;
@@ -74,7 +74,7 @@ bool sendTunnelMessage(TCPSocket& tunnel,
 // Dispatch loop for TunnelClient
 // Returns true if user requested quit (Q pressed)
 // Returns false if connection was lost (should reconnect)
-bool dispatch_loop( TCPSocket& tunnel,
+bool dispatch_loop( const std::unique_ptr<TCPSocket>& tunnel,
                     UDPSocket& udp_forwarder,
                     std::shared_ptr<TCPSocket> webSock,
                     const SockAddr& dest_udp,
@@ -87,7 +87,7 @@ bool dispatch_loop( TCPSocket& tunnel,
 
     std::vector<int> read_sockets;
     read_sockets.push_back( 0 ); // stdin
-    read_sockets.push_back( tunnel.socket() );
+    read_sockets.push_back( tunnel->socket() );
     read_sockets.push_back( udp_forwarder.socket() );
     
     // Log existing TCP connections on entry (after reconnection)
@@ -149,12 +149,12 @@ bool dispatch_loop( TCPSocket& tunnel,
             }
         }
 
-        if( FD_ISSET( tunnel.socket(), &read_fds ) )
+        if( FD_ISSET( tunnel->socket(), &read_fds ) )
         {
-            int retval = tunnel.recv( tcp_tunnel_buffer, max_buffer_size );
+            int retval = tunnel->recv( tcp_tunnel_buffer, max_buffer_size );
             if( retval < 0 )
             {
-                LOG_ERROR << "Error in TCP tunnel, socket " << tunnel.socket() << ". "
+                LOG_ERROR << "Error in TCP tunnel, socket " << tunnel->socket() << ". "
                           << strerror(errno) << std::endl;
                 LOG_INFO << "Tunnel connection lost. TCP connections will be preserved for reconnection." << std::endl;
                 cont_loop = false;

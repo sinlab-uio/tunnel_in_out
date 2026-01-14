@@ -38,6 +38,10 @@ public:
     // Return the host in host byte order.
     uint16_t getPort( ) const;
 
+    /* A connected TCP socket has information about the IP address and port
+     * of its peer, which fits into a sockaddr_in struct. Let's fetch it. */
+    bool getPeer( int socket ) const;
+
     // Print dotted decimal address and port to the given ostream.
     std::ostream& print( std::ostream& ostr ) const;
 };
