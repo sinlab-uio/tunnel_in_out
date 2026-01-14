@@ -79,6 +79,15 @@ uint16_t SockAddr::getPort( ) const
     return ntohs( addr.sin_port );
 }
 
+bool SockAddr::getPeer( int socket ) const
+{
+    socklen_t len = size();
+    int err = getpeername( socket, (struct sockaddr*)&addr, &len );
+    if( err == 0 ) return true;
+    LOG_DEBUG << "Failed to retrieve sockaddr info of TCP peer node" << std::endl;
+    return false;
+}
+
 std::ostream& SockAddr::print( std::ostream& ostr ) const
 {
     ostr << getAddress() << ":" << getPort();

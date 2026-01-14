@@ -9,7 +9,7 @@
 // Dispatch loop for TunnelClient
 // Returns true if user requested quit (Q pressed)
 // Returns false if connection was lost (should reconnect)
-bool dispatch_loop( TCPSocket& tunnel,
+bool dispatch_loop( const std::unique_ptr<TCPSocket>& tunnel,
                     UDPSocket& udp_forwarder,
                     std::shared_ptr<TCPSocket> webSock,
                     const SockAddr& dest_udp,
