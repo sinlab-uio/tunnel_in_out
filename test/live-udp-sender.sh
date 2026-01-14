@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export PATH=/Users/griff/Install/tunnel/bin
+export PATH=$HOME/Install/tunnel/bin
 
 echo "================================================================================"
 echo "= Starting a UDP sender"

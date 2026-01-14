@@ -15,7 +15,7 @@ set(CMAKE_BUILD_TYPE Debug)
 
 # I don't want to write things into /usr/local by mistake
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set_property(CACHE CMAKE_INSTALL_PREFIX PROPERTY VALUE "$ENV{HOME}/Install")
+  set_property(CACHE CMAKE_INSTALL_PREFIX PROPERTY VALUE "$ENV{HOME}/Install/tunnel")
 endif()
 
 

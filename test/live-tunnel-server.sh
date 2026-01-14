@@ -1,7 +1,5 @@
 #!/bin/bash
 
-export PATH=$PATH:/home/griff/Install/tunnel/bin
-
 echo "================================================================================"
 echo "= Starting the TunnelServer on the outside of the firewall"
 echo "= TunnelServer $* -t 5349 -u 5349 1234"
@@ -14,5 +12,5 @@ echo "==========================================================================
 # tunnel server listens for tunnel connects on port 1234
 #                       for external TCP connections on port 2345
 #                       for external UDP packets on port 2345
-TunnelServer $* -t 5349 -u 5349 3478
+$HOME/Install/tunnel/bin/TunnelServer $* -t 5349 -u 5349 3478
 
