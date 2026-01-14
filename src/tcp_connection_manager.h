@@ -14,11 +14,14 @@ public:
     struct Connection
     {
         uint32_t conn_id;
-        std::shared_ptr<TCPSocket> socket;
+        std::unique_ptr<TCPSocket> socket;
         bool valid;
         
-        Connection(uint32_t id, std::shared_ptr<TCPSocket> sock)
-            : conn_id(id), socket(sock), valid(true) {}
+        Connection(uint32_t id, std::unique_ptr<TCPSocket> sock)
+            : conn_id(id)
+            , socket( std::move(sock) )
+            , valid(true)
+        {}
     };
     
 private:
@@ -33,7 +36,7 @@ public:
     uint32_t allocateConnId();
     
     // Add a new connection
-    void addConnection(uint32_t conn_id, std::shared_ptr<TCPSocket> socket);
+    void addConnection(uint32_t conn_id, std::unique_ptr<TCPSocket>& socket);
     
     // Remove a connection
     void removeConnection(uint32_t conn_id);
