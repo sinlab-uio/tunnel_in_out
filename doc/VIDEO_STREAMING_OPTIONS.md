@@ -69,8 +69,22 @@ ffmpeg \
 	-c:v libx264 -an \
 	-tune zerolatency -preset veryfast \
 	-x264-params keyint=15:min-keyint=15:scenecut=0:bframes=0 \
-	-hls_time 1 -hls_list_size 3 -hls_flags delete_segments+low_delay -f hls /path/to/your/webserver/stream.m3u8
+	-hls_time 2 -hls_list_size 3 -hls_flags delete_segments+low_delay -f hls /var/www/hls/stream.m3u8
 ```
+
+Proposed conversion instructions:
+```
+ffmpeg -i rtp://... \
+  -c:v copy \
+  -c:a copy \
+  -f hls \
+  -hls_time 2 \
+  -hls_list_size 3 \
+  -hls_flags delete_segments+append_list \
+  -hls_segment_filename '/var/www/hls/segment%03d.ts' \
+  /var/www/hls/playlist.m3u8
+```
+
 
 ### Nginx server setup
 
@@ -87,19 +101,76 @@ There is one default server names `default` that listens on port 80.
 
 We need a server that listens on port 8080.
 
+In the /etc/nginx/nginx.con file, we make the following changes:
+```
+	# Increase buffer sizes for streaming
+        client_body_buffer_size 128k;
+        client_max_body_size 10m;
+
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        types_hash_max_size 2048;
+
+	keepalive_timeout 15;
+        send_timeout 10;
+```
+
+
 This is our config file /etc/nginx/sites-available/hls:
 ```
 server {
     listen 8080; # Port to serve HLS over HTTP
+    server_name webrtc.mlab.no
 
+    # HLS stream location
     location /hls {
         # Serve HLS fragments
         root /var/www/hls/;
+        alias /var/www/hls;
 
-        # Add CORS headers for web players if needed
+        # CORS headers (if serving to web browsers)
         add_header Access-Control-Allow-Origin *;
+        add_header Access-Control-Allow-Methods 'GET, OPTIONS';
+        add_header Access-Control-Allow-Headers 'Range';
+
+        # Critical for low-latency: disable all caching
+        add_header Cache-Control 'no-cache, no-store, must-revalidate';
+        add_header Pragma 'no-cache';
+        add_header Expires '0';
+
+        # Serve m3u8 playlists with correct MIME type
+        types {
+            application/vnd.apple.mpegurl m3u8;
+            video/mp2t ts;
+        }
+
+        # Disable buffering for live content
+        sendfile off;
+        tcp_nopush off;
+        tcp_nodelay on;
+
+        # Enable direct I/O for large files (optional, test performance)
+        directio 512k;
+
+        # Prevent caching at proxy level if behind another proxy
+        proxy_no_cache 1;
+        proxy_cache_bypass 1;
     }
 }
 ```
 This means that a client connecting to this server on the port 8080 and with a URL of the kind `http://webrtc.mlab.no:8080/hls/something.m3u8' will be served with a file name something.m3u8 from the directory `/var/www/hls`.
+
+Create the file and change ownership and access to it. In our case the owner is the user `rtc`. Do this:
+```
+sudo mkdir -p /var/www/hls
+sudo chown -R rtc:rtc /var/www/hls
+sudo chmod 755 /var/www/hls
+```
+
+Activate the site by:
+ - soft-linking from /etc/nginx/sites-enabled.
+ - validate the configuration using `sudo nginx -t`
+ - reload nginx using `sudo systemctl reload nginx`
+
 
