@@ -1,6 +1,12 @@
 #!/bin/bash
 
-DEST=192.168.50.3
+# an address for UPV: 172.31.144.1
+# the default address for UPV: 158.42.251.4
+# MAC in lab: 192.168.50.3
+
+DEST=${1:-192.168.50.3}
+# PORT=5004 - WebRTC classic
+PORT=6656
 
 echo "Sending video from the camera to destination ${DEST}"
 
@@ -10,9 +16,9 @@ echo "Sending video from the camera to destination ${DEST}"
 # -an disable audio
 # -c:v copy copy the audio format without change
 # -sdp_file <file> create the SDP file
-# ffmpeg -re -i input.mp4 -an -c:v copy -f rtp -sdp_file video.sdp "rtp://192.168.1.109:5004"
+# ffmpeg -re -i input.mp4 -an -c:v copy -f rtp -sdp_file video.sdp "rtp://192.168.1.109:${PORT}"
 
-if [[ "$1" == "cpu" ]]; then
+if [[ "$2" == "cpu" ]]; then
 echo "================================================================================"
 echo "Encode with Intel"
 echo "================================================================================"
@@ -24,7 +30,7 @@ ffmpeg -use_wallclock_as_timestamps 1 \
        -an \
        -c:v libx264 -preset ultrafast -tune zerolatency -fflags nobuffer -bf 0 -pix_fmt yuv420p \
        -x264opts keyint=30:min-keyint=1:scenecut=-1 \
-       -f rtp -sdp_file video.sdp "rtp://${DEST}:5004"
+       -f rtp -sdp_file video.sdp "rtp://${DEST}:${PORT}"
 else
 echo "================================================================================"
 echo "CUDA encoding"
@@ -41,7 +47,7 @@ ffmpeg -use_wallclock_as_timestamps 1 \
        -g 30 -coder 0 -bf 0 -sc_threshold 0 -flags +low_delay -fflags +nobuffer \
        -analyzeduration 1 -probesize 32 \
        -f rtp -sdp_file video.sdp \
-       "rtp://${DEST}:5004"
+       "rtp://${DEST}:${PORT}"
 fi
 
 
