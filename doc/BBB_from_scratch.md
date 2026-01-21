@@ -178,4 +178,7 @@ sudo chown -R rtc:rtc /var/www/hls
 Call this `index.html` and change your Nginx server settings to include
 the line 'index index.html;' in the location section.
 
+When trying to use one of these two JavaScript libraries for low-latency
+streaming, consider hls.js.
+Set "lowLatencyMode: trye" in the LL-HLS option, and reduce "maxBufferLength" to 2-4 seconds.
 
