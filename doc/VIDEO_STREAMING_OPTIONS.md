@@ -101,5 +101,5 @@ server {
     }
 }
 ```
-
+This means that a client connecting to this server on the port 8080 and with a URL of the kind `http://webrtc.mlab.no:8080/hls/something.m3u8' will be served with a file name something.m3u8 from the directory `/var/www/hls`.
 
