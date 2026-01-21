@@ -85,12 +85,19 @@ Camera (RTP) → Media Server → WebRTC → Multiple Browsers
                    ↓
               (Converts RTP to WebRTC)
 
-Popular media servers:
+### Popular media servers:
 
-Janus (C, lightweight, very popular)
-Mediasoup (Node.js, modern)
-Kurento (Java, feature-rich)
-GStreamer (library-based, flexible)
+ - Janus: https://github.com/meetecho/janus-gateway
+	Programmed in C
+
+ - Mediasoup: https://github.com/versatica/mediasoup
+	Programmed in Rust
+
+ - Kurento: https://github.com/Kurento/kurento
+ 	Programmed in JavaScript
+
+ - GStreamer: go here: https://gstreamer.freedesktop.org/documentation/webrtc/index.html?gi-language=c
+
 
 ### Simplified Flow
 
@@ -124,16 +131,13 @@ SDP vs ICE:
  - SDP: "Here's what I can send/receive" (codecs, formats)
  - ICE: "Here's how to reach me" (network paths)
 
-For Your Camera Streaming Setup
-You'll need:
+For streaming from a camera:
 
  - Media Server (Janus/Mediasoup) - converts RTP → WebRTC
  - Signaling Server (WebSocket) - coordinates connections
  - STUN Server (can use public ones)
  - TURN Server (optional, for difficult networks)
  - Web Client (HTML/JavaScript) - receives stream
-
-Typical latency: 200-800ms (much better than HLS!)
 
 # Janus
 
