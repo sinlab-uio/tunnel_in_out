@@ -192,9 +192,13 @@ server {
 
         # Serve m3u8 playlists with correct MIME type
         types {
+	    text/html html htm;
             application/vnd.apple.mpegurl m3u8;
             video/mp2t ts;
         }
+
+	# Ensure default MIME type mapping is included
+        default_type application/octet-stream;
 
         # Disable buffering for live content
         sendfile off;
