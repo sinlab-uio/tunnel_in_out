@@ -77,7 +77,7 @@ A set of protocols and APIs for peer-to-peer audio, video, and data transmission
 
 ## WebRTC Architecture Patterns
 
-### For Your Use Case (Camera → Browser):
+### Live camera to player case
 
 One-to-Many Broadcasting (Most Common):
 
