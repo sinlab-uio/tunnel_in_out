@@ -85,6 +85,57 @@ ffmpeg -i rtp://... \
   /var/www/hls/playlist.m3u8
 ```
 
+### FFmpeg conversion service on an Ubuntu machine
+
+Writing the ffmpeg rule:
+
+```
+sudo -u rtc ffmpeg -i rtp://... \
+  -c:v copy \
+  -c:a copy \
+  -f hls \
+  -hls_time 2 \
+  -hls_list_size 3 \
+  -hls_flags delete_segments+append_list \
+  -hls_segment_filename '/var/www/hls/segment%03d.ts' \
+  /var/www/hls/playlist.m3u8
+```
+
+Turning it into a service:
+
+In a file called `/etc/systemd/system/hls-converter.service`, say
+```
+ini[Unit]
+Description=FFmpeg HLS Converter
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+Restart=always
+RestartSec=5
+ExecStart=/usr/bin/ffmpeg -i rtp://your_stream_url \
+  -c:v copy \
+  -c:a copy \
+  -f hls \
+  -hls_time 2 \
+  -hls_list_size 3 \
+  -hls_flags delete_segments+append_list \
+  -hls_segment_filename '/var/www/hls/segment%%03d.ts' \
+  /var/www/hls/playlist.m3u8
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then make it a service that is maintained by systemd:
+
+```
+sudo systemctl daemon-reload
+sudo systemctl enable hls-converter
+sudo systemctl start hls-converter
+```
 
 ### Nginx server setup
 
