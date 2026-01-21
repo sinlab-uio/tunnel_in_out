@@ -4,6 +4,9 @@
 #include <memory>
 #include <algorithm>
 
+#include <thread>
+#include <chrono>
+
 #include <argp.h>
 
 #include <unistd.h> // for close
@@ -41,7 +44,8 @@ std::unique_ptr<TCPSocket> connectWithRetry(const std::string& host, uint16_t po
         if (attempt < max_attempts)
         {
             LOG_INFO << "Waiting " << delay_seconds << " seconds before retry..." << std::endl;
-            sleep(delay_seconds);
+            // sleep(delay_seconds);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
     
