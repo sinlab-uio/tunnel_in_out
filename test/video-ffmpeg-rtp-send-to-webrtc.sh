@@ -5,8 +5,8 @@
 # MAC in lab: 192.168.50.3
 
 DEST=${1:-158.39.75.57}
-PORT=5004 - WebRTC classic
-# PORT=6656 - UPV open port
+PORT=5004 # - WebRTC classic
+# PORT=6656 # - UPV open port
 
 echo "Sending video from the camera to destination ${DEST}"
 
@@ -35,19 +35,27 @@ else
 echo "================================================================================"
 echo "CUDA encoding"
 echo "================================================================================"
-ffmpeg -use_wallclock_as_timestamps 1 \
+echo ffmpeg -use_wallclock_as_timestamps 1 \
        -re \
        -f v4l2 -video_size 3840x1920 -input_format mjpeg -codec:v mjpeg -framerate 30 \
        -fflags +nobuffer \
        -i /dev/video0 \
        -an \
        -c:v h264_nvenc \
-       -preset ll \
-       -b:v 2M -maxrate 2M -bufsize 2M \
-       -g 30 -coder 0 -bf 0 -sc_threshold 0 -flags +low_delay -fflags +nobuffer \
-       -analyzeduration 1 -probesize 32 \
-       -f rtp -sdp_file video.sdp \
+       -preset p1 \
+       -f rtp \
        "rtp://${DEST}:${PORT}"
+
+       ffmpeg -use_wallclock_as_timestamps 1 \
+	      -re -f v4l2 -video_size 3840x1920 -input_format mjpeg -framerate 30 -i /dev/video0 -c:v h264_nvenc -preset p1 -f rtp rtp://158.39.75.57:5004
+
+       # INPUT
+       # -fflags +nobuffer \
+       # OUTPUT
+       # -b:v 2M -maxrate 2M -bufsize 2M \
+       # -analyzeduration 1 -probesize 32 \
+       # -g 30 -coder 0 -bf 0 -flags +low_delay -fflags +nobuffer \
+       # -sdp_file video.sdp \
 fi
 
 
