@@ -22,11 +22,11 @@
 // Attempt to connect to TunnelServer with retry
 // Returns valid TCPSocket or invalid socket if max retries exceeded
 std::unique_ptr<TCPSocket> connectWithRetry(const std::string& host, uint16_t port, 
-                                            int max_attempts = 5, int delay_seconds = 2)
+                                            int max_attempts = 100 )
 {
-    for (int attempt = 1; attempt <= max_attempts; attempt++)
+    for (int attempt = 0; attempt < max_attempts; attempt++)
     {
-        LOG_INFO << "Connection attempt " << attempt << " of " << max_attempts 
+        LOG_INFO << "Connection attempt " << attempt+1 << " of " << max_attempts 
                  << " to " << host << ":" << port << std::endl;
         
         std::unique_ptr<TCPSocket> tunnel(new TCPSocket(host, port));
@@ -38,17 +38,24 @@ std::unique_ptr<TCPSocket> connectWithRetry(const std::string& host, uint16_t po
             return tunnel;
         }
         
-        LOG_WARN << "Connection attempt " << attempt << " failed" << std::endl;
+	if( attempt == 0 )
+	{
+       	    std::cerr << "Connection attempt 1 failed" << std::endl;
+	}
+	else
+	{
+	    std::cerr << " " << attempt+1;
+	}
+       	LOG_WARN << "Connection attempt " << attempt+1 << " failed" << std::endl;
         tunnel.reset(); // explicit delete although it auto-deletes in next loop
         
         if (attempt < max_attempts)
         {
-            LOG_INFO << "Waiting " << delay_seconds << " seconds before retry..." << std::endl;
-            // sleep(delay_seconds);
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
-    
+
+    std::cerr << std::endl;
     LOG_ERROR << "Failed to connect after " << max_attempts << " attempts" << std::endl;
     return nullptr;
 }
@@ -123,9 +130,6 @@ int main( int argc, char* argv[] )
         {
             std::cout << "= Tunnel connection lost. Attempting reconnection..." << std::endl;
             LOG_INFO << "Tunnel disconnected. Will attempt to reconnect." << std::endl;
-            
-            // Brief pause before reconnecting
-            sleep(1);
         }
     }
     
