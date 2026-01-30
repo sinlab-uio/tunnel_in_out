@@ -15,5 +15,49 @@ sudo apt-get -y install autoconf automake libtool pkg-config texinfo wget build-
     libunistring-dev libaom-dev libdav1d-dev nasm libx264-dev libx265-dev libnuma-dev libvpx-dev \
     libfdk-aac-dev libopus-dev libdav1d-dev
 ```
+## Fetch ffmpeg
 
-    
+```
+git clone https://git.ffmpeg.org/ffmpeg.git
+```
+
+## Configure ffmpeg
+
+NOTE: this part of the description is incomplete. Describe how NVENC is added. Describe how H.264 meta information is included into RTP streams.
+
+
+Change into the directory where you extracted ffmpeg from GIT. After that:
+
+```
+export FFMPEG_SRC=$HOME/GIT/ffmpeg
+export FFMPEG_BUILD=$HOME/ffmpeg_build
+export FFMPEG_INSTALL=$HOME/Install/ffmpeg
+
+mkdir $FFMPEG_BUILD
+cd $FFMPEG_SRC
+PATH="$FFMPEG_INSTALL/bin:$PATH" PKG_CONFIG_PATH="$FFMPEG_BUILD/lib/pkgconfig" ./configure \
+  --prefix="$FFMPEG_BUILD" \
+  --pkg-config-flags="--static" \
+  --extra-cflags="-I$FFMPEG_BUILD/include" \
+  --extra-ldflags="-L$FFMPEG_BUILD/lib" \
+  --extra-libs="-lpthread -lm" \
+  --ld="g++" \
+  --bindir="$HOME/bin" \
+  --enable-gpl \
+  --enable-gnutls \
+  --enable-libaom \
+  --enable-libass \
+  --enable-libfdk-aac \
+  --enable-libfreetype \
+  --enable-libmp3lame \
+  --enable-libopus \
+  --enable-libsvtav1 \
+  --enable-libdav1d \
+  --enable-libvorbis \
+  --enable-libvpx \
+  --enable-libx264 \
+  --enable-libx265 \
+  --enable-nonfree
+PATH="$FFMPEG_INSTALL/bin:$PATH" make && make install
+hash -r
+```
