@@ -51,7 +51,6 @@ PATH="$FFMPEG_INSTALL/bin:$PATH" PKG_CONFIG_PATH="$FFMPEG_BUILD/lib/pkgconfig" .
   --enable-libfreetype \
   --enable-libmp3lame \
   --enable-libopus \
-  --enable-libsvtav1 \
   --enable-libdav1d \
   --enable-libvorbis \
   --enable-libvpx \
