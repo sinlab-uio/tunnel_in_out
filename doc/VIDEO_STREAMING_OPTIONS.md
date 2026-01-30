@@ -1,5 +1,11 @@
 # Streaming attempts
 
+## On the MSI laptop
+
+The MSI laptop has a built-in camera. It is a USB device that is hot-plugged and hot-unplugged by pressing FN-F6. It shows a white light when it is on.
+The built-in camera and the VR.cam get their device numbers in the order of appearance.
+The one that is found first by the system becomes /dev/video0, the second one becomes /dev/video2. I don't know if you can change the order without rebooting. Easier to keep the built-in camera turned off when you don't need it.
+
 ## RTP end-to-end
 
 TODO: Requires NAT traversal on the receiver side.
