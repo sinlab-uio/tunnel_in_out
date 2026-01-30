@@ -10,7 +10,11 @@ echo "= SDP file is ${SDP_FILE}"
 echo "================================================================================"
 
 # Play back from RTP
-ffplay -protocol_whitelist "file,rtp,udp" -i ${SDP_FILE}
+ffplay \
+	-max_delay 10000 -sync video \
+	-protocol_whitelist "file,rtp,udp" -i ${SDP_FILE}
+
+#	-loglevel debug \
 
 # Google says
 # ffplay -fflags nobuffer -flags low_delay -probesize 32 -analyzeduration 1 -strict experimental -framedrop -f rtp rtp://[DESTINATION_IP]:[PORT]

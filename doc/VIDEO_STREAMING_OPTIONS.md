@@ -6,6 +6,44 @@ The MSI laptop has a built-in camera. It is a USB device that is hot-plugged and
 The built-in camera and the VR.cam get their device numbers in the order of appearance.
 The one that is found first by the system becomes /dev/video0, the second one becomes /dev/video2. I don't know if you can change the order without rebooting. Easier to keep the built-in camera turned off when you don't need it.
 
+## Try GStreamer for reception
+
+```
+sudo apt install gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav
+
+```
+
+```
+gst-launch-1.0 -v udpsrc port=5000 caps = "application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96" ! \
+  rtph264depay ! \
+  nvh264dec ! \
+  glimagesink sync=false
+```
+
+```
+gst-launch-1.0 playbin uri="file://$(pwd)/stream.sdp"
+```
+
+Test that gstreamer video output works in principle:
+```
+gst-launch-1.0 videotestsrc ! videoconvert ! autovideosink
+```
+
+Test that gstreamer can play from the video devices:
+```
+gst-launch-1.0 v4l2src device=/dev/video2 ! videoconvert ! autovideosink
+```
+
+A video sink that listens for RTP, does not work
+```
+gst-launch-1.0 -v udpsrc port=5004 caps = "application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96" ! rtph264depay ! decodebin ! videoconvert ! autovideosink
+```
+
+GStreamer pipeline for sending RTP
+```
+gst-launch-1.0 -v videotestsrc ! x264enc tune=zerolatency bitrate=500 speed-preset=superfast ! rtph264pay ! udpsink host=127.0.0.1 port=5004
+```
+
 ## RTP end-to-end
 
 TODO: Requires NAT traversal on the receiver side.
