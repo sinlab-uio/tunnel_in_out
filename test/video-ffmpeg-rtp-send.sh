@@ -46,6 +46,7 @@ ffmpeg -use_wallclock_as_timestamps 1 \
        -b:v 2M -maxrate 2M -bufsize 2M \
        -g 30 -coder 0 -bf 0 -sc_threshold 0 -flags +low_delay -fflags +nobuffer \
        -analyzeduration 1 -probesize 32 \
+       -flags +global_header \
        -f rtp -sdp_file video.sdp \
        "rtp://${DEST}:${PORT}"
 fi
