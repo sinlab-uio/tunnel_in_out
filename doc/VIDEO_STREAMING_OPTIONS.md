@@ -25,14 +25,29 @@ ffmpeg -use_wallclock_as_timestamps 1 \
        -b:v 2M -maxrate 2M -bufsize 2M \
        -g 30 -coder 0 -bf 0 -sc_threshold 0 -flags +low_delay -fflags +nobuffer \
        -analyzeduration 1 -probesize 32 \
+       -flags +global_header \
        -f rtp -sdp_file video.sdp \
        "rtp://${DEST}:${PORT}"
 ```
 
-WARNING: Currently, this requires 3 steps:
+#### WARNING
+Currently, this requires 3 steps:
  - Run the commands once. It creates a video.sdp file. This is a human-readable text file that the client needs to know where data is coming from. At ffmpeg version 4.2.7, this is still buggy. The first line in video.sdp is "SDP:", which is not allowed by the RFC 8866. Stop the command delete that first line.
  - Copy the video.sdp to the client. Perhaps using git add/push and pull on the other side.
  - Run the command again. Ignore the new video.sdp file, it's broken again. But the server is streaming RTP/UDP/IP packets.
+
+#### WARNING
+ - When we live-stream RTP and the SDP is created, the following line is incomplete in the SDP file
+ ```a=fmtp:96 packetization-mode=1; sprop-parameter-sets=Z2QAM6xyBEB4AiflwEQAAAMABAAAAwDAPGDGEYA=,aOhDssiw; profile-level-id=640033```
+   The sprop information that encodes details about the video format is missing for the live stream, because RTP is capable of changing this while the streaming is going on. For that reason, the information must be embedded in the live stream itself. The H.264 headers can contain the relevant information, and I am fairly certain that RTP packets are capable of carrying such information, but it must be parsed out of the H.264 headers in real-time. ffmpeg does no do that by default, but stackoverflow posts imply that there are compile-time flags that enable it.
+ - It seems that we can send the SPS/PPS (Sequence Parameter Set/Picture Parameter Set) NALUs in-band. There is a comment that this requires an I (IBR frame?). That may be true and should not be a problam because parameter changes will require a new IBR frame anyway. To send this, use `-flags +global_header`.
+ - If the encoder/transcoder is x264 (not the case for us), use `-x264-params repeat-header=1` to force SPS/PPS information before every keyframe.
+
+
+#### More flags
+Some more interesting flags found on the web:
+ - `-flags global_header` enables global H.264 header, from (here)[https://superuser.com/questions/1011976/how-to-make-ffmpeg-stream-h264-with-pps-and-sps-in-the-rtp-stream]
+ - `-bsf h264_mp4toannexb` supposedly enables Annex B header information
 
 ### RTP-to-HLS translation
 
