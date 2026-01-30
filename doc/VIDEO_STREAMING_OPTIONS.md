@@ -48,6 +48,7 @@ Currently, this requires 3 steps:
 Some more interesting flags found on the web:
  - `-flags global_header` enables global H.264 header, from (here)[https://superuser.com/questions/1011976/how-to-make-ffmpeg-stream-h264-with-pps-and-sps-in-the-rtp-stream]
  - `-bsf h264_mp4toannexb` supposedly enables Annex B header information
+ - `-fflags +genpts` may be needed on the encoder side of the command line to force generation of the SPS/PPS header info.
 
 ### RTP-to-HLS translation
 
