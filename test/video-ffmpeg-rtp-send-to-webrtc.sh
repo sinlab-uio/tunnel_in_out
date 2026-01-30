@@ -18,6 +18,11 @@ echo "Sending video from the camera to destination ${DEST}"
 # -sdp_file <file> create the SDP file
 # ffmpeg -re -i input.mp4 -an -c:v copy -f rtp -sdp_file video.sdp "rtp://192.168.1.109:${PORT}"
 
+#
+# Find all parameters for NVEnc encoders
+#
+# ffmpeg -hide_banner -h encoder=h264_nvenc
+
 if [[ "$2" == "cpu" ]]; then
 echo "================================================================================"
 echo "Encode with Intel"
@@ -29,6 +34,7 @@ ffmpeg -use_wallclock_as_timestamps 1 \
        -i /dev/video0 \
        -an \
        -c:v libx264 -preset ultrafast -tune zerolatency -fflags nobuffer -bf 0 -pix_fmt yuv420p \
+       -profile:v baseline -level:v 3.1 \
        -x264opts keyint=30:min-keyint=1:scenecut=-1 \
        -f rtp -sdp_file video.sdp "rtp://${DEST}:${PORT}"
 else
@@ -47,7 +53,12 @@ echo ffmpeg -use_wallclock_as_timestamps 1 \
        "rtp://${DEST}:${PORT}"
 
        ffmpeg -use_wallclock_as_timestamps 1 \
-	      -re -f v4l2 -video_size 3840x1920 -input_format mjpeg -framerate 30 -i /dev/video0 -c:v h264_nvenc -preset p1 -f rtp rtp://158.39.75.57:5004
+	      -re -f v4l2 -video_size 3840x1920 -input_format mjpeg -framerate 30 -i /dev/video0 \
+	      -c:v h264_nvenc \
+	      -preset p1 -tune ull -profile baseline -level 3.1 -rc vbr \
+	      -bf 0 \
+	      -f rtp rtp://158.39.75.57:5004
+
 
        # INPUT
        # -fflags +nobuffer \

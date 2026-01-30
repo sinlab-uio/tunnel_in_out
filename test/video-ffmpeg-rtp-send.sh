@@ -8,7 +8,7 @@ DEST=${1:-192.168.50.3}
 # PORT=5004 - WebRTC classic
 PORT=6656
 
-echo "Sending video from the camera to destination ${DEST}"
+echo "Sending video from the camera to destination ${DEST}:${PORT}"
 
 # ffplay -f v4l2 -video_size 3840x1920 -input_format mjpeg -codec:v mjpeg -framerate 30 -fflags +nobuffer -i /dev/video0
 
