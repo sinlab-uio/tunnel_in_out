@@ -4,9 +4,27 @@
 # the default address for UPV: 158.42.251.4
 # MAC in lab: 192.168.50.3
 
+# Parameter 1: destination IP address
 DEST=${1:-192.168.50.3}
-# PORT=5004 - WebRTC classic
-PORT=6656
+
+# Parameter 2: destination port, 5004 is the classical WebRTC potr
+# PORT=${2:-5004}
+PORT=${2:-6656}
+
+# Parameter 3: cpu or gpu encoding, gpu is default
+ENCODER="${3:-gpu}"
+
+# Parameter 4: video device to read from, machine could have several, default is /dev/video0
+#              depending on the device properties, set the resolution of the input stream
+DEVICENO=${4:-0}
+DEVICE="/dev/video${DEVICENO}"
+INPUTRES=3840x1920
+v4l2-ctl -D -d ${VIDEODEV} | grep BisonCam > /dev/null
+if [ $? -eq 0 ] ; then
+    echo "Camera is onboard BisonCam, resolution is only 1920x1080"
+    INPUTRES=1920x1080
+fi
+
 
 echo "Sending video from the camera to destination ${DEST}:${PORT}"
 
@@ -23,15 +41,15 @@ echo "Sending video from the camera to destination ${DEST}:${PORT}"
 #
 # ffmpeg -hide_banner -h encoder=h264_nvenc
 
-if [[ "$2" == "cpu" ]]; then
+if [[ "${ENCODER}" == "cpu" ]]; then
 echo "================================================================================"
 echo "Encode with Intel"
 echo "================================================================================"
 ffmpeg -use_wallclock_as_timestamps 1 \
        -re \
-       -f v4l2 -video_size 3840x1920 -input_format mjpeg -codec:v mjpeg -framerate 30 \
+       -f v4l2 -video_size ${INPUTRES} -input_format mjpeg -codec:v mjpeg -framerate 30 \
        -fflags +nobuffer \
-       -i /dev/video0 \
+       -i ${DEVICE}\
        -an \
        -c:v libx264 -preset ultrafast -tune zerolatency -fflags nobuffer -bf 0 -pix_fmt yuv420p \
        -profile:v baseline -level:v 3.1 \
@@ -43,9 +61,9 @@ echo "CUDA encoding"
 echo "================================================================================"
 ffmpeg -use_wallclock_as_timestamps 1 \
        -re \
-       -f v4l2 -video_size 3840x1920 -input_format mjpeg -codec:v mjpeg -framerate 30 \
+       -f v4l2 -video_size ${INPUTRES} -input_format mjpeg -codec:v mjpeg -framerate 30 \
        -fflags +nobuffer \
-       -i /dev/video0 \
+       -i ${DEVICE}\
        -an \
        -c:v h264_nvenc \
        -preset p1 -tune ull -profile:v baseline -rc vbr \
