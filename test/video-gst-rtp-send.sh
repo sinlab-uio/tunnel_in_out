@@ -12,7 +12,8 @@ PORT=${2:-5004}
 # PORT=${2:-6656}
 
 # Parameter 3: cpu or gpu encoding, gpu is default
-ENCODER="${3:-gpu}"
+#              gpu doesn't work yet
+ENCODER="${3:-cpu}"
 
 # Parameter 4: video device to read from, machine could have several, default is /dev/video0
 #              depending on the device properties, set the resolution of the input stream
@@ -31,18 +32,17 @@ echo "Sending video from the camera to destination ${DEST}:${PORT}"
 if [[ "${ENCODER}" == "cpu" ]]; then
 
 gst-launch-1.0 -v v4l2src device=${DEVICE} \
-	! image/jpeg,width=1920,height=1080,framerate=30/1 ! jpegdec \
-	! videoconvert \
+ 	! video/x-raw,width=1280,height=720 \
 	! x264enc tune=zerolatency bitrate=500 speed-preset=superfast \
 	! rtph264pay \
 	! udpsink host=${DEST} port=${PORT}
 
 # Reading larger input resolutions makes this really slow
+#	! image/jpeg,width=1920,height=1080,framerate=30/1 ! jpegdec ! videoconvert \
 #	! image/jpeg,width=640,height=480,framerate=30/1 ! jpegdec \
 #	! image/jpeg,width=1920,height=1080,framerate=30/1 ! jpegdec \
 #	! video/x-raw,width=640,height=480 \
 #	! video/x-raw,width=1920,height=1080 \
-# 	! video/x-raw,width=1280,height=720 \
 
 else
 
