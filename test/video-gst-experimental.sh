@@ -54,19 +54,28 @@ echo "**************************************************************************
 
 # You can terminate the pipeline with
 #     ! testsink
-# to figure out whether part of the pipeline already works
+# to figure out whether part of the pipeline already works.
+# After several tests, I found out that the VR.cam can definitely now use the current (Feb 2026) version of
+# nvjpegdec. The Motion JPEG output of the VR.cam must be converted into a frame flow using the CPU version
+# jpegdec before uploading it the NVidia CPU.
 
 echo "Input resolution is ${INPUTX}x${INPUTY}"
 
 SCALEX=1280
 SCALEY=720
 
-GPUMODE="cpudec-noscale"
-# GPUMODE="cpudec-scale"
-# GPUMODE="gpudec-scale"
-
-case $GPUMODE in
-    "cpudec-noscale")
+case $ENCODER in
+    "gpu-x")
+        gst-launch-1.0 -v v4l2src device=${DEVICE} ! image/jpeg,width=${INPUTX},height=${INPUTY},framerate=30/1 \
+            ! jpegdec \
+            ! cudaupload \
+            ! cudaconvert \
+	    ! nvh264enc preset=low-latency-hp rc-mode=cbr bitrate=5000 gop-size=60 zerolatency=true \
+	    ! h264parse \
+	    ! rtph264pay config-interval=1 pt=96 \
+            ! udpsink host=${DEST} port=${PORT}
+        ;;
+    "gpu-noscale")
         gst-launch-1.0 -v v4l2src device=${DEVICE} ! image/jpeg,width=${INPUTX},height=${INPUTY},framerate=30/1 \
             ! jpegdec \
             ! cudaupload \
@@ -75,7 +84,7 @@ case $GPUMODE in
             ! rtph264pay \
             ! udpsink host=${DEST} port=${PORT}
         ;;
-    "cpudec-scale")
+    *)
         gst-launch-1.0 -v v4l2src device=${DEVICE} ! image/jpeg,width=${INPUTX},height=${INPUTY},framerate=30/1 \
             ! jpegdec \
             ! cudaupload \
@@ -85,23 +94,7 @@ case $GPUMODE in
             ! rtph264pay \
             ! udpsink host=${DEST} port=${PORT}
         ;;
-    "gpudec-scale")
-        gst-launch-1.0 -v v4l2src device=${DEVICE} ! image/jpeg,width=${INPUTX},height=${INPUTY},framerate=30/1 \
-            ! nvjpegdec \
-            ! cudaconvert \
-            ! nvh264enc preset=low-latency-hq bitrate=500 \
-            ! rtph264pay \
-            ! udpsink host=${DEST} port=${PORT}
-        ;;
 esac
-exit 0
-
-  	# ! "video/x-raw,width=1920,height=1080,framerate=30/1" \
-	# ! cudaupload \
-	# ! nvh264enc preset=low-latency-hp rc-mode=cbr bitrate=5000 gop-size=60 zerolatency=true \
-	# ! h264parse \
-	# ! rtph264pay config-interval=1 pt=96 \
-	# ! udpsink host=${DEST} port=${PORT} sync=false async=false
 
 # Special command for Tegras:
 # gst-launch-1.0 -v v4l2src device=/dev/video0 \
