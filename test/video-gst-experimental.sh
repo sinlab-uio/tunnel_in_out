@@ -60,37 +60,41 @@ echo "Input resolution is ${INPUTX}x${INPUTY}"
 
 SCALEX=1280
 SCALEY=720
-SCALINGLINE=
 
-if true; then
-gst-launch-1.0 -v v4l2src device=/dev/video0 ! image/jpeg,width=${INPUTX},height=${INPUTY},framerate=30/1 \
-    ! jpegdec \
-    ! cudaupload \
-    ! cudaconvert \
-    ! nvh264enc preset=low-latency-hq bitrate=500 \
-    ! rtph264pay \
-    ! udpsink host=${DEST} port=${PORT}
-else
-gst-launch-1.0 -v v4l2src device=/dev/video0 ! image/jpeg,width=${INPUTX},height=${INPUTY},framerate=30/1 \
-    ! jpegdec \
-    ! cudaupload \
-    ! cudaconvert \
-    ! cudascale ! "video/x-raw(memory:CUDAMemory),width=${SCALEX},height=${SCALEY}" \
-    ! nvh264enc preset=low-latency-hq bitrate=500 \
-    ! rtph264pay \
-    ! udpsink host=${DEST} port=${PORT}
-fi
+GPUMODE="cpudec-noscale"
+# GPUMODE="cpudec-scale"
+# GPUMODE="gpudec-scale"
 
-
+case $GPUMODE in
+    "cpudec-noscale")
+        gst-launch-1.0 -v v4l2src device=${DEVICE} ! image/jpeg,width=${INPUTX},height=${INPUTY},framerate=30/1 \
+            ! jpegdec \
+            ! cudaupload \
+            ! cudaconvert \
+            ! nvh264enc preset=low-latency-hq bitrate=500 \
+            ! rtph264pay \
+            ! udpsink host=${DEST} port=${PORT}
+        ;;
+    "cpudec-scale")
+        gst-launch-1.0 -v v4l2src device=${DEVICE} ! image/jpeg,width=${INPUTX},height=${INPUTY},framerate=30/1 \
+            ! jpegdec \
+            ! cudaupload \
+            ! cudaconvert \
+            ! cudascale ! "video/x-raw(memory:CUDAMemory),width=${SCALEX},height=${SCALEY}" \
+            ! nvh264enc preset=low-latency-hq bitrate=500 \
+            ! rtph264pay \
+            ! udpsink host=${DEST} port=${PORT}
+        ;;
+    "gpudec-scale")
+        gst-launch-1.0 -v v4l2src device=${DEVICE} ! image/jpeg,width=${INPUTX},height=${INPUTY},framerate=30/1 \
+            ! nvjpegdec \
+            ! cudaconvert \
+            ! nvh264enc preset=low-latency-hq bitrate=500 \
+            ! rtph264pay \
+            ! udpsink host=${DEST} port=${PORT}
+        ;;
+esac
 exit 0
-
-gst-launch-1.0 -v v4l2src device=${DEVICE} ! image/jpeg,width=${INPUTX},height=${INPUTY},framerate=30/1 \
-    ! nvjpegdec \
-    ! cudaconvert \
-    ! cudascale ! "video/x-raw(memory:CUDAMemory),width=1280,height=720" \
-    ! nvh264enc preset=low-latency-hq bitrate=500 \
-    ! rtph264pay \
-    ! udpsink host=${DEST} port=${PORT}
 
   	# ! "video/x-raw,width=1920,height=1080,framerate=30/1" \
 	# ! cudaupload \
