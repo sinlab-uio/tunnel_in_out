@@ -2,12 +2,15 @@
 
 # the default address for UPV: 158.42.251.4
 # MAC in lab: 192.168.50.3
+# webrtc in NREC: 158.39.75.57
 
 # Parameter 1: destination IP address
 # DEST=${1:-192.168.50.3}
 DEST=${1:-158.42.251.4}
 
 # Parameter 2: destination port, 5004 is the classical WebRTC potr
+# UPV listens on port 6656
+# webrtc in NREC listens on port 5004
 PORT=${2:-5004}
 # PORT=${2:-6656}
 
@@ -37,7 +40,7 @@ gst-launch-1.0 -v v4l2src device=${DEVICE} \
 	! videoscale \
 	! video/x-raw, width=1280,height=720 \
 	! x264enc tune=zerolatency bitrate=500 speed-preset=superfast \
-	! rtph264pay \
+	! rtph264pay config-interval=1 \
 	! udpsink host=${DEST} port=${PORT}
 
 # Reading larger input resolutions makes this really slow
@@ -49,7 +52,7 @@ gst-launch-1.0 -v v4l2src device=${DEVICE} \
 #	! video/x-raw,width=1920,height=1080 \
 
 else
-    # This pipeline works well without the cudascale line
+    # This pipeline works well also without the cudascale line
     SCALEX=1280
     # SCALEY=720
     SCALEY=1440
