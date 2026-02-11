@@ -61,6 +61,7 @@ else
 
     # Consider the bitrate value. bitrate=5000 means 5Mbit/s. It may be a good idea to use 1000 or 2000.
 
+    set -x
     gst-launch-1.0 -v v4l2src device=${DEVICE} ! image/jpeg,width=${INPUTX},height=${INPUTY},framerate=30/1 \
         ! jpegdec \
         ! cudaupload \
@@ -69,5 +70,6 @@ else
 	! nvh264enc preset=low-latency-hp rc-mode=cbr bitrate=2000 gop-size=60 zerolatency=true \
 	! rtph264pay config-interval=1 pt=96 \
         ! udpsink host=${DEST} port=${PORT}
+    set +x
 fi
 
