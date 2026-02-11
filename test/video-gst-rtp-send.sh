@@ -64,7 +64,7 @@ else
         ! cudaupload \
         ! cudaconvert \
         ! cudascale ! "video/x-raw(memory:CUDAMemory),width=${SCALEX},height=${SCALEY}" \
-	! nvh264enc preset=low-latency-hp rc-mode=cbr bitrate=5000 gop-size=60 zerolatency=true \
+	! nvh264enc preset=low-latency-hp rc-mode=cbr bitrate=2000 gop-size=60 zerolatency=true \
 	! rtph264pay config-interval=1 pt=96 \
         ! udpsink host=${DEST} port=${PORT}
 fi
