@@ -22,11 +22,13 @@ ENCODER="${3:-cpu}"
 #              depending on the device properties, set the resolution of the input stream
 DEVICENO=${4:-0}
 DEVICE="/dev/video${DEVICENO}"
-INPUTRES=3840x1920
+INPUTX=3840
+INPUTY=1920
 v4l2-ctl -D -d ${DEVICE} | grep BisonCam > /dev/null
 if [ $? -eq 0 ] ; then
     echo "Camera is onboard BisonCam, resolution is only 1920x1080"
-    INPUTRES=1920x1080
+    INPUTX=1920
+    INPUTY=1080
 fi
 
 
