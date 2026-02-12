@@ -1,6 +1,15 @@
-# ffmpeg from scratch
+# Introduction
 
-ffmpeg must currently be compiled from scratch to stream H.264 over MPEG-2-TS/RTP/UDP/IP. The reason is that the stream description in SDP is not generated in advance (for the obvious reason that the stream is live), and the video format information must therefore be contained in the TS stream itself. This feature is not included in ffmpeg by default.
+First of all: This may be entirely unnecessary. Use GStreamer instead of ffmpeg to read video from /dev/video and send it.
+
+Furthermore, find out if you can use Ubuntu's pre-installed pipewire for reading from the video devices. It may allow several
+application to read from the same device.
+
+# Compiling ffmpeg from scratch
+
+You may have to compile ffmpeg from scratch to stream H.264 over MPEG-2-TS/RTP/UDP/IP.
+The reason is that the stream description in SDP is not generated in advance (for the obvious reason that the stream is live), and the video format information must therefore be contained in the TS stream itself.
+This feature has not always been included in ffmpeg by default.
 
 ## Prepare Ubuntu
 
