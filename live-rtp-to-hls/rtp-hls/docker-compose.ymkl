@@ -1,0 +1,14 @@
+services:
+  ffmpeg-hls:
+    build: .
+    container_name: ffmpeg-hls
+    restart: unless-stopped          # keeps it running after crashes/reboots
+    network_mode: host               # simplest for UDP/RTP — avoids NAT issues
+    volumes:
+      - ./hls-output:/hls-output     # Nginx reads from here on the host
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
