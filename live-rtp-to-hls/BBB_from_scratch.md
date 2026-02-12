@@ -1,22 +1,29 @@
 # Making an HLS version of BigBuckBunny
 
+Before trying to deliver quasi-live video by converting RTP into HLS, we can try video
+streaming from a web server with the classical BigBuckBunny video.
+
 ## Make preparations
 - `sudo apt install ffmpeg`
 
 ## Download BigBuckBunny
-wget http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4
+`wget http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4`
 
 ## Create HLS segments
-sudo mkdir -p /var/www/hls
+```
+sudo mkdir -p /var/www/hls/bbb
 sudo ffmpeg -i BigBuckBunny.mp4 \
   -c:v libx264 -c:a aac \
   -hls_time 4 \
   -hls_list_size 0 \
-  -hls_segment_filename '/var/www/hls/segment%03d.ts' \
-  /var/www/hls/playlist.m3u8
+  -hls_segment_filename '/var/www/hls/bbb/segment%03d.ts' \
+  /var/www/hls/bbb/playlist.m3u8
+```
 
 ## Set ownership
+```
 sudo chown -R rtc:rtc /var/www/hls
+```
 
 ## Web page to serve HLS content
 
@@ -86,7 +93,7 @@ sudo chown -R rtc:rtc /var/www/hls
 
     <script>
         // Your HLS stream URL
-        const streamUrl = '/hls/playlist.m3u8';
+        const streamUrl = '/hls/bbb/playlist.m3u8';
         document.getElementById('streamUrl').textContent = streamUrl;
 
         // ========== HLS.JS PLAYER (Better for low-latency) ==========
