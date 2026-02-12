@@ -4,8 +4,9 @@ services:
     container_name: ffmpeg-hls
     restart: unless-stopped          # keeps it running after crashes/reboots
     network_mode: host               # simplest for UDP/RTP — avoids NAT issues
+    user: "1007:1007"                # Don't run as root (default), run as the user rtc@webrtc.mlab.no
     volumes:
-      - ./hls-output:/hls-output     # Nginx reads from here on the host
+      - /var/www/hls/live:/hls-output # expose a host path (left) as a local subdirectory (right)
     logging:
       driver: "json-file"
       options:
