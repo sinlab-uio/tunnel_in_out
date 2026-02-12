@@ -29,18 +29,31 @@ b=AS:5000
 a=rtpmap:96 H264/90000
 a=fmtp:96 packetization-mode=1
 ```
-`v=`stands for version, `o=` contains information about the sender. This can be the sending user, session IDs
+ - `v=`stands for version.
+ - `o=` contains information about the sender. This can be the sending user, session IDs
 and session version. To transmit over IPv4, `IN IP4` is required. The final address is a valid address of the
-sender. is a valid address of the sender. `s=` contains a stream description.
-`c=` is important because it contains the protocol and IP address of the receiver; meaning in this case the
-machine where the converter runs. `t=` provides the start and end timestamps for a stream. These are both 0
-for live streams.
-`a=tool:` describes the sender application. The receiver could use knowledge of that tool for special behaviours.
-`a=type:` is informational only, and usually contains `broadcast` or `unicast`.
-`m=` starts one media block in the SDP description. Several of these blocks may be present.
+sender. is a valid address of the sender.
+ - `s=` contains a stream description.
+ - `c=` is important because it contains the protocol and IP address of the receiver; meaning in this case the
+machine where the converter runs.
+ - `t=` provides the start and end timestamps for a stream. These are both 0 for live streams.
+ - `a=tool:` describes the sender application. The receiver could use knowledge of that tool for special behaviours.
+ - `a=type:` is informational only, and usually contains `broadcast` or `unicast`.
+ - `m=` starts one media block in the SDP description. Several of these blocks may be present.
 The line specifies in this case that the medium is video arriving on UDP part 5004, implemented as RTP over UDP.
-The `96` is an example of a non-stanardized media type number. Since it is not standardized, `a=rtpmap:` and
-`a=fmtp:` lines are expected for more information.
+The `96` is an example of a non-stanardized media type number (96-127 are allowed). Since it is not standardized,
+`a=rtpmap:` and `a=fmtp:` lines are expected for more information.
+ - `b=AS:" means bandwidth, application-specific maximum, and it is a promise from the sender not to exceed this
+bitrate. The player can allocated buffers accordingly. That are also `b=TIAS:` and `b=CT:`.
+ - `a=rtpmap:` makes a connection from the media type number to more information about the encoding. This is first
+a string, followed by a sampling rate. The string is something that the player must know, there is no obvious
+standard and the list grows with every RTP profile that is standardized.
+ - `a=ftmp:" is highly codec-specific. Although old as a line, it hasn't been required for the mainstream video
+codecs before H.264. Essentially, information about dynamic decisions is taken from the video headers and store
+here, allowing the receiver to set up everything before the media stream arrives. For the reception of RTP and HLS,
+it is a relatively bad idea because these settings change during the stream, but that information must be forced
+in the stream itself on the sender side, and some parameters are still unavoidable here.
+
 
 ## Conversion with ffmpeg
 
