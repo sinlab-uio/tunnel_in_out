@@ -13,8 +13,8 @@ void TCPConnectionManager::addConnection(uint32_t conn_id, std::unique_ptr<TCPSo
 {
     if (socket && socket->valid())
     {
-        _connections.emplace( conn_id, Connection( conn_id, std::move(socket) ) );
         _socket_to_conn_id[socket->socket()] = conn_id;
+        _connections.emplace( conn_id, Connection( conn_id, std::move(socket) ) );
     }
 }
     
